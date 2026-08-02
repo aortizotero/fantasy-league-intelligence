@@ -1,0 +1,14 @@
+{
+  "name": "fantasy-league-intelligence",
+  "version": "1.0.0",
+  "description": "v1 — Sleeper API integration: standings, H2H records, league GOAT",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}

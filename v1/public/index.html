@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fantasy League Intelligence</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🏈 Fantasy League Intelligence</h1>
+    <p class="subtitle">Standings, historial de enfrentamientos, y el GOAT de tu liga — solo pon tu League ID de Sleeper.</p>
+  </header>
+
+  <form id="league-form">
+    <input type="text" id="league-id" placeholder="League ID de Sleeper (ej. 123456789012345678)" required>
+    <button type="submit">Analizar liga</button>
+  </form>
+
+  <p id="status"></p>
+
+  <main id="results" hidden>
+    <section id="league-info"></section>
+
+    <section id="narratives-section">
+      <h2>📖 Las Historias de tu Liga</h2>
+      <p class="hint">Lo que los números no te dicen a simple vista.</p>
+      <div id="narratives"></div>
+    </section>
+
+    <section>
+      <h2>Standings — Temporada Actual</h2>
+      <div id="current-standings"></div>
+    </section>
+
+    <section>
+      <h2>🐐 GOAT de la Liga</h2>
+      <p class="hint">Ranking histórico: campeonatos primero, récord de victorias como desempate.</p>
+      <div id="goat"></div>
+    </section>
+
+    <section>
+      <h2>Head-to-Head</h2>
+      <p class="hint">Récord entre cada par de managers, a través de todas las temporadas.</p>
+      <div id="h2h"></div>
+    </section>
+
+    <section>
+      <h2>Standings por Temporada</h2>
+      <div id="historical-standings"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
