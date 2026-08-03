@@ -6,6 +6,8 @@ Herramienta de analítica de fantasy football que arranca como una integración 
 
 **[→ v1 ya está funcionando: standings, historial de enfrentamientos, ranking GOAT, e historias generadas automáticamente](v1/)**
 
+**[→ Roadmap de producto: fases de MVP viral, engagement, monetización y escala](ROADMAP.es.md)**
+
 ## El arco
 
 Cada versión agrega un tipo de integración genuinamente distinto, no solo más features sobre el mismo stack:
