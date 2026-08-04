@@ -58,6 +58,8 @@ Verificado en vivo: encontró que a `alexortizotero` le anotó la defensa de Dal
 
 Falla con gracia cuando ESPN no tiene el dato: equipos de defensa (ej. "Dallas Cowboys") no son "athletes" reales en ESPN, y no todos los jugadores traen `espn_id` poblado en el dump de Sleeper (De'Von Achane no lo tenía al momento de probar) — en esos casos la narrativa simplemente se queda en solo-puntos, sin romper nada.
 
+**En vivo:** [storyofmyleague.com](https://storyofmyleague.com) — deploy vía Coolify (self-hosted, VPS propio de Alex) usando `v1/Dockerfile` (Base Directory `/v1`, sin Nixpacks). DNS en GoDaddy (registro A en `@` apuntando al servidor, `www` como CNAME al root). Sin variables de entorno — Sleeper y ESPN son APIs públicas sin auth. SSL automático vía Let's Encrypt (lo maneja Coolify solo).
+
 **Próximo paso:** sin decidir todavía — v3 (capa de AI/Claude) es lo siguiente en el roadmap versionado, pero como con v2, vale la pena preguntar antes de asumir que es lo que sigue.
 
 ## Notas
