@@ -51,6 +51,22 @@
     </section>
   </main>
 
+  <div id="card-modal" class="card-modal" hidden>
+    <div class="card-modal-inner">
+      <button id="card-close" class="card-close" aria-label="Cerrar" type="button">✕</button>
+      <div class="card-canvas-wrap">
+        <div id="card-canvas"></div>
+      </div>
+      <div class="card-actions">
+        <button id="card-download" type="button">⬇️ Descargar</button>
+        <button id="card-share" type="button">📤 Compartir</button>
+      </div>
+      <p id="card-hint" class="hint"></p>
+    </div>
+  </div>
+
+  <script src="vendor/html-to-image.js"></script>
+  <script src="cards.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

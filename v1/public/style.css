@@ -125,9 +125,158 @@ table.matrix td.diag { color: var(--border); }
 .narrative-headline { font-size: 17px; font-weight: 700; margin-bottom: 6px; line-height: 1.3; }
 .narrative-detail { color: var(--muted); font-size: 13px; line-height: 1.5; }
 
+/* Stat card triggers — same rows/cells the user already reads, now also
+   clickable. Hover state signals "this generates something", not just a
+   data point. */
+.card-trigger-row, .card-trigger-cell { cursor: pointer; }
+.card-trigger-row:hover { background: rgba(0, 196, 106, 0.14); }
+td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--accent); }
+.card-hint-tap { text-align: center; margin: 0 0 12px; }
+
+.season-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.season-header h3 { margin: 16px 0 0; }
+
+.card-trigger-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-weight: 500;
+}
+.card-trigger-btn:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
+.narrative-card { position: relative; }
+.narrative-card .card-trigger-btn { margin-top: 12px; }
+
+/* ---- Share card modal --------------------------------------------- */
+.card-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 6, 8, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+.card-modal[hidden] { display: none; }
+.card-modal-inner {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+  position: relative;
+  text-align: center;
+}
+.card-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1;
+}
+.card-canvas-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.card-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.card-actions button { flex: 1; }
+#card-share { background: #2a2e38; color: var(--text); }
+#card-hint { min-height: 18px; margin: 10px 0 0; }
+
+/* The card itself — fixed square, captured at pixelRatio:3 by html-to-image
+   for a real ~1080px export while staying compact on screen. */
+.stat-card {
+  width: 320px;
+  height: 320px;
+  border-radius: 20px;
+  background: linear-gradient(160deg, #171a21, #0f1115);
+  border: 1px solid rgba(0, 196, 106, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+}
+.stat-card-eyebrow {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 14px;
+  text-align: center;
+}
+.stat-card-emoji { font-size: 48px; line-height: 1; margin-bottom: 8px; }
+.stat-card-name { font-size: 24px; font-weight: 700; text-align: center; }
+.stat-card-rings { font-size: 20px; margin: 6px 0 16px; }
+.stat-card-stat-row { display: flex; gap: 18px; }
+.stat-card-stat { display: flex; flex-direction: column; align-items: center; }
+.stat-card-num { font-size: 18px; font-weight: 700; }
+.stat-card-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+.stat-card-vs { display: flex; align-items: center; gap: 10px; }
+.stat-card-vs-name { font-size: 18px; font-weight: 700; max-width: 110px; text-align: center; }
+.stat-card-vs-versus { color: var(--accent); font-size: 12px; font-weight: 700; }
+.stat-card-record { font-size: 40px; font-weight: 800; margin: 18px 0 6px; }
+.stat-card-caption { color: var(--muted); font-size: 12px; }
+
+.stat-card-season { font-size: 30px; font-weight: 800; margin-top: 4px; }
+.stat-card-ranklist { width: 100%; margin-top: 16px; }
+.stat-card-rank-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.stat-card-rank-row:last-child { border-bottom: none; }
+
+.stat-card-narrative-title {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.stat-card-narrative-headline { font-size: 19px; font-weight: 700; text-align: center; line-height: 1.3; margin-bottom: 10px; }
+.stat-card-narrative-detail { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.5; }
+
+.stat-card-footer {
+  position: absolute;
+  bottom: 16px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+.stat-card { position: relative; }
+
 @media (max-width: 480px) {
   body { padding: 20px 12px 60px; }
   #league-form { flex-direction: column; max-width: 100%; }
   section { padding: 16px; }
   h1 { font-size: 22px; }
+  .stat-card { width: 280px; height: 280px; padding: 20px; }
 }

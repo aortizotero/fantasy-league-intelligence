@@ -16,6 +16,7 @@ form.addEventListener("submit", async (e) => {
     if (!res.ok) throw new Error(data.error || "Error desconocido");
 
     render(data);
+    if (window.initCards) window.initCards(data);
     statusEl.textContent = "";
     results.hidden = false;
   } catch (err) {
@@ -41,9 +42,16 @@ function render(data) {
   document.getElementById("goat").innerHTML = goatCard(data.goat);
   document.getElementById("h2h").innerHTML = scrollWrap(h2hMatrix(data.h2h, data.goat));
   document.getElementById("historical-standings").innerHTML = data.historicalStandings
-    .slice()
+    .map((s, i) => ({ s, i }))
     .reverse()
-    .map((s) => `<h3>${escapeHtml(s.season)}</h3>${scrollWrap(standingsTable(s.standings))}`)
+    .map(
+      ({ s, i }) => `
+      <div class="season-header">
+        <h3>${escapeHtml(s.season)}</h3>
+        <button class="card-trigger-btn" data-card="season" data-index="${i}" type="button">📤 Compartir</button>
+      </div>
+      ${scrollWrap(standingsTable(s.standings))}`
+    )
     .join("");
 }
 
@@ -75,12 +83,13 @@ function standingsTable(standings) {
 function narrativeCards(narratives) {
   return `<div class="narrative-grid">${narratives
     .map(
-      (n) => `
+      (n, i) => `
     <div class="narrative-card">
       <div class="narrative-icon">${n.icon}</div>
       <div class="narrative-title">${escapeHtml(n.title)}</div>
       <div class="narrative-headline">${escapeHtml(n.headline)}</div>
       <div class="narrative-detail">${escapeHtml(n.detail)}</div>
+      <button class="card-trigger-btn" data-card="narrative" data-index="${i}" type="button">📤 Compartir</button>
     </div>`
     )
     .join("")}</div>`;
@@ -96,7 +105,7 @@ function goatCard(goat) {
   const restRows = rest
     .map(
       (g, i) => `
-    <tr>
+    <tr class="card-trigger-row" data-card="goat" data-index="${i + 1}" title="Compartir el ranking de ${escapeHtml(g.displayName)}">
       <td>${i + 2}</td>
       <td>${escapeHtml(g.displayName)}</td>
       <td>${g.championships > 0 ? "🏆".repeat(g.championships) : "—"}</td>
@@ -108,7 +117,7 @@ function goatCard(goat) {
     .join("");
 
   return `
-    <div class="goat-hero">
+    <div class="goat-hero card-trigger-row" data-card="goat" data-index="0" title="Compartir el GOAT de la liga">
       <div class="goat-hero-emoji">🐐</div>
       <div>
         <div class="goat-hero-name">${escapeHtml(champion.displayName)}</div>
@@ -116,6 +125,7 @@ function goatCard(goat) {
         <div class="goat-hero-stats">${champion.wins}-${champion.losses}${champion.ties ? `-${champion.ties}` : ""} · ${(champion.winPct * 100).toFixed(1)}% · ${champion.seasons} temporadas</div>
       </div>
     </div>
+    <p class="hint card-hint-tap">📤 Toca una fila para generar su stat card</p>
     ${rest.length ? scrollWrap(`<table><thead><tr><th>#</th><th>Manager</th><th>Campeonatos</th><th>Record histórico</th><th>Win%</th><th>Temporadas</th></tr></thead><tbody>${restRows}</tbody></table>`) : ""}
   `;
 }
@@ -139,8 +149,9 @@ function h2hMatrix(h2h, goat) {
       const cells = managers
         .map((colMgr) => {
           if (rowMgr.ownerId === colMgr.ownerId) return `<td class="diag">—</td>`;
-          const record = lookup.get(`${rowMgr.ownerId}::${colMgr.ownerId}`) || "—";
-          return `<td>${record}</td>`;
+          const record = lookup.get(`${rowMgr.ownerId}::${colMgr.ownerId}`);
+          if (!record) return `<td>—</td>`;
+          return `<td class="card-trigger-cell" data-card="h2h" data-a-name="${escapeHtml(rowMgr.displayName)}" data-b-name="${escapeHtml(colMgr.displayName)}" data-record="${escapeHtml(record)}" title="Compartir este head-to-head">${record}</td>`;
         })
         .join("");
       return `<tr><th class="row-label">${escapeHtml(rowMgr.displayName)}</th>${cells}</tr>`;
