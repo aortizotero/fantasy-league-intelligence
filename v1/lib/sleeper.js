@@ -1,6 +1,8 @@
 // Thin client + business logic over the public Sleeper API (no auth required).
 // Docs: https://docs.sleeper.com/
 
+import { getStatLine } from "./espn.js";
+
 const BASE = "https://api.sleeper.app/v1";
 const MAX_SEASONS = 25; // safety cap when walking previous_league_id chains
 
@@ -322,7 +324,7 @@ export function getPlayersMap() {
         if (!p) continue;
         const name = p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim();
         if (!name) continue;
-        map.set(id, { name, position: p.position || "", team: p.team || "FA" });
+        map.set(id, { name, position: p.position || "", team: p.team || "FA", espnId: p.espn_id || null });
       }
       return map;
     });
@@ -398,22 +400,32 @@ async function computePlayerNarratives(chain, playersMap) {
 
   const narratives = [];
   const playerName = (id) => playersMap.get(id)?.name || `Jugador ${id}`;
+  // Real stat lines (yards, TDs, etc.) from ESPN — a nice-to-have layer on
+  // top of the Sleeper-only points/starters mechanic above. Any failure
+  // here (unknown espn_id, team defense, API hiccup) just means the
+  // narrative stays points-only instead of breaking.
+  const statLine = (id, season, week) => getStatLine(playersMap.get(id)?.espnId, season, week).catch(() => null);
 
   if (bestWeek) {
+    const line = await statLine(bestWeek.playerId, bestWeek.season, bestWeek.week);
     narratives.push({
       icon: "🚀",
       title: "La Actuación del Año",
       headline: `${playerName(bestWeek.playerId)} — ${bestWeek.points.toFixed(1)} pts`,
-      detail: `Semana ${bestWeek.week}, ${bestWeek.season}, en el roster titular de ${bestWeek.owner.displayName}. La mejor semana individual en la historia de la liga.`,
+      detail: `Semana ${bestWeek.week}, ${bestWeek.season}, en el roster titular de ${bestWeek.owner.displayName}.${line ? ` ${line}.` : ""} La mejor semana individual en la historia de la liga.`,
     });
   }
 
   if (worstBenchCall) {
+    const [starterLine, benchLine] = await Promise.all([
+      statLine(worstBenchCall.starterId, worstBenchCall.season, worstBenchCall.week),
+      statLine(worstBenchCall.benchedId, worstBenchCall.season, worstBenchCall.week),
+    ]);
     narratives.push({
       icon: "🪑",
       title: "El Peor Banquillo",
       headline: worstBenchCall.owner.displayName,
-      detail: `Semana ${worstBenchCall.week}, ${worstBenchCall.season}: tituló a ${playerName(worstBenchCall.starterId)} (${worstBenchCall.starterPts.toFixed(1)} pts) con ${playerName(worstBenchCall.benchedId)} (${worstBenchCall.benchedPts.toFixed(1)} pts) sentado en la banca. ${worstBenchCall.regret.toFixed(1)} puntos perdidos por la alineación.`,
+      detail: `Semana ${worstBenchCall.week}, ${worstBenchCall.season}: tituló a ${playerName(worstBenchCall.starterId)} (${worstBenchCall.starterPts.toFixed(1)} pts${starterLine ? ` — ${starterLine}` : ""}) con ${playerName(worstBenchCall.benchedId)} (${worstBenchCall.benchedPts.toFixed(1)} pts${benchLine ? ` — ${benchLine}` : ""}) sentado en la banca. ${worstBenchCall.regret.toFixed(1)} puntos perdidos por la alineación.`,
     });
   }
 

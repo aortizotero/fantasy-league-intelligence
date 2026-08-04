@@ -54,7 +54,11 @@ Probado en vivo contra la liga real de Alex ("Dominators Dinasty", 6 temporadas,
 
 Verificado en vivo: encontró que a `alexortizotero` le anotó la defensa de Dallas (1.0 pts) mientras tenía a De'Von Achane (49.3 pts) en la banca (semana 3, 2023) — 48.3 puntos perdidos por la alineación.
 
-**Próximo paso:** v2 fase 2 — cruzar con ESPN's hidden API (`site.api.espn.com`, sin auth) vía el `espn_id` que ya trae el dump de jugadores de Sleeper, para enriquecer estas narrativas con stat lines reales en vez de solo puntos.
+**v2 fase 2 shipped** — `lib/espn.js`: cruce con la API no oficial de ESPN (`site.web.api.espn.com/apis/common/v3/sports/football/nfl/athletes/{espn_id}/gamelog?season={year}`, sin auth) vía el `espn_id` que ya trae el dump de jugadores de Sleeper. Enriquece "La Actuación del Año" y "El Peor Banquillo" con el stat line real de esa semana (ej. "Rushing: 32 CAR, 185 YDS, 4 TD") en vez de solo puntos fantasy. Verificado a mano contra un box score real (Jonathan Taylor, semana 11 2021 vs. Buffalo — 32 acarreos, 185 yardas, 4 TDs terrestres, coincide exacto con espn.com). Cachea el game log completo por `espnId:season` indefinidamente (mismo criterio "sin TTL" que el resto del proyecto — un box score pasado no cambia).
+
+Falla con gracia cuando ESPN no tiene el dato: equipos de defensa (ej. "Dallas Cowboys") no son "athletes" reales en ESPN, y no todos los jugadores traen `espn_id` poblado en el dump de Sleeper (De'Von Achane no lo tenía al momento de probar) — en esos casos la narrativa simplemente se queda en solo-puntos, sin romper nada.
+
+**Próximo paso:** sin decidir todavía — v3 (capa de AI/Claude) es lo siguiente en el roadmap versionado, pero como con v2, vale la pena preguntar antes de asumir que es lo que sigue.
 
 ## Notas
 
