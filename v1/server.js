@@ -8,6 +8,7 @@ import {
   computeH2H,
   computeGOAT,
   computeNarratives,
+  getPlayersMap,
 } from "./lib/sleeper.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,10 +32,16 @@ app.get("/api/league/:leagueId", async (req, res) => {
     // season" (its last entry, since the chain is oldest -> newest) and the
     // GOAT career totals — avoids fetching the same rosters/users twice.
     const historicalStandings = await getHistoricalStandings(chain);
-    const [h2h, goat] = await Promise.all([computeH2H(chain), computeGOAT(chain, historicalStandings)]);
+    // getPlayersMap() fetches Sleeper's global player directory, independent
+    // of this league, so it runs alongside h2h/goat instead of after them.
+    const [h2h, goat, playersMap] = await Promise.all([
+      computeH2H(chain),
+      computeGOAT(chain, historicalStandings),
+      getPlayersMap(),
+    ]);
     // Narratives are derived FROM h2h + goat, so they run after (not in
     // parallel with) the calls that produce those.
-    const narratives = await computeNarratives(chain, historicalStandings, h2h, goat);
+    const narratives = await computeNarratives(chain, historicalStandings, h2h, goat, playersMap);
 
     res.json({
       league: { name: league.name, season: league.season, totalSeasons: chain.length },

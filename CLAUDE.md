@@ -50,7 +50,11 @@ Probado en vivo contra la liga real de Alex ("Dominators Dinasty", 6 temporadas,
 
 **Stat cards compartibles** también shipped sobre v1 (`public/cards.js`, `public/vendor/html-to-image.js`): 4 tipos de card (GOAT, H2H, resumen de temporada, narrativa individual), generadas en cliente con `html-to-image` (card renderizada a 320px, exportada a `pixelRatio: 3` para ~1080px real) y compartidas vía Web Share API con fallback a descarga en desktop. Se activan haciendo clic directo sobre la fila/celda/card correspondiente en la UI existente (sin controles nuevos separados). `html-to-image` está vendored localmente en `public/vendor/` (no es dependencia de npm — solo se usó para extraer el build UMD), para no depender de un CDN en runtime.
 
-**Próximo paso:** v2 (cruce con stats reales de jugadores).
+**v2 fase 1 shipped** — dos narrativas nuevas a nivel jugador en `computeNarratives` (v. `computePlayerNarratives` en `lib/sleeper.js`): "La Actuación del Año" (mejor semana individual de un titular en la historia de la liga) y "El Peor Banquillo" (mayor diferencia de puntos entre el titular más flojo y el banca más productivo de una misma semana, mínimo 5 pts para filtrar casos triviales). Ambas usan `players_points`/`starters` que Sleeper ya regresa en cada matchup — **sin ninguna API externa todavía**, ese fue el hallazgo clave: el cruce con ESPN/nfl.com solo hace falta para enriquecer con stat lines reales (yardas, TDs), no para la mecánica base. Nombres de jugadores vía `getPlayersMap()` (dump completo `/v1/players/nfl` de Sleeper, ~5MB, cacheado una sola vez por proceso — es data global, no por liga). Cero cambios en frontend: las cards y la lista de narrativas son genéricas sobre `{icon, title, headline, detail}`, así que las nuevas narrativas aparecen y son compartibles automáticamente.
+
+Verificado en vivo: encontró que a `alexortizotero` le anotó la defensa de Dallas (1.0 pts) mientras tenía a De'Von Achane (49.3 pts) en la banca (semana 3, 2023) — 48.3 puntos perdidos por la alineación.
+
+**Próximo paso:** v2 fase 2 — cruzar con ESPN's hidden API (`site.api.espn.com`, sin auth) vía el `espn_id` que ya trae el dump de jugadores de Sleeper, para enriquecer estas narrativas con stat lines reales en vez de solo puntos.
 
 ## Notas
 

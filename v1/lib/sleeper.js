@@ -302,13 +302,131 @@ export async function computeGOAT(chain, seasonStandings) {
   return career;
 }
 
+// ---- Player-level narratives (v2) --------------------------------------
+// Real player IDs and weekly fantasy points come straight from Sleeper's own
+// matchup data (players_points/starters) — no external stats API needed for
+// this part. Player *names* aren't in the matchup payload though, so they
+// need the separate players/nfl directory below.
+let playersMapPromise = null;
+
+// Sleeper's full player directory (~5MB: every player_id it has ever
+// tracked -> name/position/team). Global, not league-scoped, and
+// effectively static, so it's fetched once per process and cached forever
+// — same "no TTL, intentional" approach as the rest of this file, just at
+// process scope instead of per-league.
+export function getPlayersMap() {
+  if (!playersMapPromise) {
+    playersMapPromise = fetchJSON(`${BASE}/players/nfl`).then((raw) => {
+      const map = new Map();
+      for (const [id, p] of Object.entries(raw || {})) {
+        if (!p) continue;
+        const name = p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim();
+        if (!name) continue;
+        map.set(id, { name, position: p.position || "", team: p.team || "FA" });
+      }
+      return map;
+    });
+  }
+  return playersMapPromise;
+}
+
+const MIN_BENCH_REGRET = 5; // points — filters out trivial, not-a-real-story start/sit calls
+
+// Walks every regular-season week of every season looking for two things:
+// the single best individual scoring week by anyone in a starting lineup,
+// and the single biggest "should've started him" bench mistake. Reuses the
+// same cached weekly matchups computeH2H already fetched via
+// getMatchupsCached, so this costs zero extra network calls when narratives
+// run after H2H (which server.js already guarantees).
+async function computePlayerNarratives(chain, playersMap) {
+  let bestWeek = null; // { points, playerId, season, week, owner }
+  let worstBenchCall = null; // { regret, ... }
+
+  for (const league of chain) {
+    const rosterMap = await buildRosterMap(league);
+    const lastWeek = (league.settings?.playoff_week_start || 15) - 1;
+    const weeks = Array.from({ length: Math.max(lastWeek, 0) }, (_, i) => i + 1);
+    const weeklyMatchups = await Promise.all(weeks.map((week) => getMatchupsCached(league.league_id, week)));
+
+    weeklyMatchups.forEach((matchups, weekIdx) => {
+      if (!matchups) return;
+      const week = weekIdx + 1;
+
+      for (const m of matchups) {
+        const owner = rosterMap.get(m.roster_id);
+        if (!owner) continue;
+        const points = m.players_points || {};
+        const starters = (m.starters || []).filter((id) => id && id !== "0");
+        const bench = (m.players || []).filter((id) => id && !starters.includes(id));
+        if (!starters.length) continue;
+
+        for (const id of starters) {
+          const pts = points[id];
+          if (pts == null) continue;
+          if (!bestWeek || pts > bestWeek.points) {
+            bestWeek = { points: pts, playerId: id, season: league.season, week, owner };
+          }
+        }
+
+        if (!bench.length) continue;
+        let worstStarter = null;
+        for (const id of starters) {
+          const pts = points[id] ?? 0;
+          if (!worstStarter || pts < worstStarter.pts) worstStarter = { id, pts };
+        }
+        let bestBench = null;
+        for (const id of bench) {
+          const pts = points[id] ?? 0;
+          if (!bestBench || pts > bestBench.pts) bestBench = { id, pts };
+        }
+        const regret = bestBench.pts - worstStarter.pts;
+        if (regret >= MIN_BENCH_REGRET && (!worstBenchCall || regret > worstBenchCall.regret)) {
+          worstBenchCall = {
+            regret,
+            season: league.season,
+            week,
+            owner,
+            benchedId: bestBench.id,
+            benchedPts: bestBench.pts,
+            starterId: worstStarter.id,
+            starterPts: worstStarter.pts,
+          };
+        }
+      }
+    });
+  }
+
+  const narratives = [];
+  const playerName = (id) => playersMap.get(id)?.name || `Jugador ${id}`;
+
+  if (bestWeek) {
+    narratives.push({
+      icon: "🚀",
+      title: "La Actuación del Año",
+      headline: `${playerName(bestWeek.playerId)} — ${bestWeek.points.toFixed(1)} pts`,
+      detail: `Semana ${bestWeek.week}, ${bestWeek.season}, en el roster titular de ${bestWeek.owner.displayName}. La mejor semana individual en la historia de la liga.`,
+    });
+  }
+
+  if (worstBenchCall) {
+    narratives.push({
+      icon: "🪑",
+      title: "El Peor Banquillo",
+      headline: worstBenchCall.owner.displayName,
+      detail: `Semana ${worstBenchCall.week}, ${worstBenchCall.season}: tituló a ${playerName(worstBenchCall.starterId)} (${worstBenchCall.starterPts.toFixed(1)} pts) con ${playerName(worstBenchCall.benchedId)} (${worstBenchCall.benchedPts.toFixed(1)} pts) sentado en la banca. ${worstBenchCall.regret.toFixed(1)} puntos perdidos por la alineación.`,
+    });
+  }
+
+  return narratives;
+}
+
 // Turns the same numbers everyone can already see in tables into the kind
 // of storylines a league actually talks about. Every narrative here is a
 // plain rule over data we've already computed — no invented flavor text
 // stapled onto a stat, and nothing shows up unless the underlying data
 // actually supports it (small sample sizes are filtered out rather than
 // forced into a narrative).
-export async function computeNarratives(chain, seasonStandings, h2h, goat) {
+export async function computeNarratives(chain, seasonStandings, h2h, goat, playersMap) {
   const narratives = [];
   const MIN_CAREER_GAMES = 15; // enough seasons for "best record" to mean something
   const MIN_RIVALRY_GAMES = 5; // enough matchups for a rivalry to be real, not noise
@@ -381,6 +499,13 @@ export async function computeNarratives(chain, seasonStandings, h2h, goat) {
       headline: `${bestTitle.line.displayName} — ${bestTitle.season}`,
       detail: `Campeón con ${bestTitle.line.wins}-${bestTitle.line.losses}${bestTitle.line.ties ? `-${bestTitle.line.ties}` : ""} (${(bestTitle.line.winPct * 100).toFixed(1)}%) en temporada regular. No solo ganó el título, dominó desde el inicio.`,
     });
+  }
+
+  // 5-6. Player-level stories (best individual week, worst start/sit call) —
+  // only run if a players directory was supplied, since callers that don't
+  // need them (or don't want the ~5MB fetch) can simply omit it.
+  if (playersMap) {
+    narratives.push(...(await computePlayerNarratives(chain, playersMap)));
   }
 
   return narratives;
