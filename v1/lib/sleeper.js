@@ -378,6 +378,61 @@ export async function computeDraftPickCapital(currentLeague) {
     .sort((a, b) => b.netPicks - a.netPicks);
 }
 
+// ---- Week recap -----------------------------------------------------------
+// Results, biggest blowout, and closest game for the most recently played
+// week of the *current* season. Searches backward from a generous cap
+// (NFL fantasy seasons rarely run past week 18, playoffs included) rather
+// than trusting any single "current week" field, since that's proven
+// inconsistent across league settings/seasons in practice.
+const WEEK_SEARCH_CAP = 18;
+
+async function findLastPlayedWeek(league) {
+  for (let week = WEEK_SEARCH_CAP; week >= 1; week -= 1) {
+    const matchups = await getMatchupsCached(league.league_id, week);
+    // Sleeper can return trailing weeks with live-scoring leftovers (real
+    // points, but matchup_id: null — no actual fantasy matchup happened)
+    // once a season's last real week has passed. Require a real matchup_id,
+    // not just a nonzero score, or a played-out season falsely "finds" one
+    // extra ghost week past its actual finale.
+    if (matchups && matchups.length && matchups.some((m) => m.matchup_id != null && (m.points || 0) > 0)) {
+      return { week, matchups };
+    }
+  }
+  return null;
+}
+
+export async function computeWeekRecap(currentLeague) {
+  const found = await findLastPlayedWeek(currentLeague);
+  if (!found) return null; // nothing played yet this season
+
+  const rosterMap = await buildRosterMap(currentLeague);
+  const byMatchupId = new Map();
+  for (const m of found.matchups) {
+    if (m.matchup_id == null) continue;
+    if (!byMatchupId.has(m.matchup_id)) byMatchupId.set(m.matchup_id, []);
+    byMatchupId.get(m.matchup_id).push(m);
+  }
+
+  const results = [];
+  for (const pair of byMatchupId.values()) {
+    if (pair.length !== 2) continue; // bye week / malformed data
+    const [m1, m2] = pair;
+    const r1 = rosterMap.get(m1.roster_id);
+    const r2 = rosterMap.get(m2.roster_id);
+    if (!r1 || !r2) continue;
+    const teamA = { ownerId: r1.ownerId, displayName: r1.displayName, points: m1.points || 0 };
+    const teamB = { ownerId: r2.ownerId, displayName: r2.displayName, points: m2.points || 0 };
+    results.push({ teamA, teamB, margin: Math.abs(teamA.points - teamB.points) });
+  }
+  if (!results.length) return null;
+
+  results.sort((a, b) => b.teamA.points + b.teamB.points - (a.teamA.points + a.teamB.points));
+  const blowout = [...results].sort((a, b) => b.margin - a.margin)[0];
+  const tightest = [...results].sort((a, b) => a.margin - b.margin)[0];
+
+  return { season: currentLeague.season, week: found.week, results, blowout, tightest };
+}
+
 // ---- Player-level narratives (v2) --------------------------------------
 // Real player IDs and weekly fantasy points come straight from Sleeper's own
 // matchup data (players_points/starters) — no external stats API needed for

@@ -12,6 +12,7 @@ import {
   getChampionsBySeasonIndex,
   computeRosterDepth,
   computeDraftPickCapital,
+  computeWeekRecap,
 } from "./lib/sleeper.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -60,9 +61,10 @@ app.get("/api/league/:leagueId", async (req, res) => {
     // Roster-building tools — "who's stacked at a position" and "who has
     // extra draft capital" — both scoped to the *current* league (the one
     // the user actually entered), not the whole historical chain.
-    const [rosterDepth, draftPicks] = await Promise.all([
+    const [rosterDepth, draftPicks, weekRecap] = await Promise.all([
       computeRosterDepth(league, playersMap),
       computeDraftPickCapital(league),
+      computeWeekRecap(league),
     ]);
 
     res.json({
@@ -75,6 +77,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       champions,
       rosterDepth,
       draftPicks,
+      weekRecap,
     });
   } catch (err) {
     console.error(err);

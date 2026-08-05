@@ -69,6 +69,8 @@ function buildCardHtml(ds) {
       // by myteam.js, so the data rides along on the trigger button itself
       // instead of an index into currentData.
       return narrativeCardHtml({ icon: ds.icon, title: ds.title, headline: ds.headline, detail: ds.detail }, leagueName);
+    case "week":
+      return currentData.weekRecap ? weekCardHtml(currentData.weekRecap, leagueName) : null;
     default:
       return null;
   }
@@ -102,6 +104,23 @@ function championCardHtml(c, season, leagueName) {
       <div class="stat-card-stat"><span class="stat-card-num">${c.wins}-${c.losses}${c.ties ? `-${c.ties}` : ""}</span><span class="stat-card-label">Récord</span></div>
       <div class="stat-card-stat"><span class="stat-card-num">${(c.winPct * 100).toFixed(1)}%</span><span class="stat-card-label">Win%</span></div>
       <div class="stat-card-stat"><span class="stat-card-num">${c.pointsFor.toFixed(0)}</span><span class="stat-card-label">Puntos</span></div>
+    </div>
+  `);
+}
+
+function weekCardHtml(wr, leagueName) {
+  const line = (r) => `${escapeHtml(r.teamA.displayName)} ${r.teamA.points.toFixed(1)} - ${r.teamB.points.toFixed(1)} ${escapeHtml(r.teamB.displayName)}`;
+  return cardShell(`
+    <div class="stat-card-eyebrow">📅 Semana ${wr.week} — ${escapeHtml(leagueName)}</div>
+    <div class="stat-card-week-block">
+      <div class="stat-card-narrative-title">💥 Golpe de la Semana</div>
+      <div class="stat-card-week-score">${line(wr.blowout)}</div>
+      <div class="stat-card-caption">${wr.blowout.margin.toFixed(1)} pts de diferencia</div>
+    </div>
+    <div class="stat-card-week-block">
+      <div class="stat-card-narrative-title">😰 Partido Más Cerrado</div>
+      <div class="stat-card-week-score">${line(wr.tightest)}</div>
+      <div class="stat-card-caption">${wr.tightest.margin.toFixed(1)} pts de diferencia</div>
     </div>
   `);
 }

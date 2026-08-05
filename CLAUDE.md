@@ -76,7 +76,11 @@ Falla con gracia cuando ESPN no tiene el dato: equipos de defensa (ej. "Dallas C
 
 **Rivalidades personalizadas shipped** — "Tu Némesis" (a quién le tienes peor récord) y "Tu Víctima" (a quién más dominas), calculadas 100% client-side en `myteam.js` a partir del `h2h` que ya está cargado, en cuanto seleccionas tu equipo en "Mi equipo". No son narrativas del servidor (dependen de quién esté viendo, no son un hecho fijo de la liga), así que viven aparte de `data.narratives` — pero se comparten igual: `cards.js` ganó un tipo `"personal"` que arma la card directo desde los atributos `data-*` del botón en vez de buscar por índice en un arreglo. Verificado en vivo: alexortizotero tiene 1-6-1 contra carlos1rvp (némesis) y 7-2-1 contra Fedesalazar10 (víctima) — coincide exacto con la matriz H2H.
 
-Con esto la liga ya tiene 9 narrativas automáticas de liga, 2 narrativas personales, 5 tipos de stat card, y 2 herramientas de roster — probablemente el punto natural para pausar el "exprimir lo que ya tenemos" y decidir el siguiente salto real.
+**Resumen de la Semana shipped** — nueva sección arriba del todo (justo debajo del nombre de la liga): resultados de la última semana jugada de la temporada actual, más dos callouts ("💥 Golpe de la Semana" y "😰 Partido Más Cerrado"), y un 6º tipo de stat card compartible. `computeWeekRecap` en `lib/sleeper.js` busca hacia atrás desde la semana 18 hasta encontrar la última con matchups reales — reusa los matchups semanales ya cacheados por el H2H, cero llamadas nuevas.
+
+Bug real encontrado y arreglado en el camino: Sleeper puede regresar una semana "fantasma" después de terminada la temporada (`matchup_id: null` pero `points` con datos reales — parece ser scoring en vivo residual de la NFL sin partido de fantasy asociado). La búsqueda original solo validaba `points > 0` y encontraba esa semana fantasma en vez de la última real. Ahora también exige `matchup_id != null`. Verificado en vivo contra la temporada 2025 ya jugada: encontró correctamente la semana 17 (la final — alexcuate 158.2 vs JorgeGBXI 120.5, coincide con el campeón real de esa temporada).
+
+Con esto la liga ya tiene 9 narrativas automáticas de liga, 2 narrativas personales, 6 tipos de stat card, 2 herramientas de roster, y un resumen semanal — probablemente el punto natural para pausar el "exprimir lo que ya tenemos" y decidir el siguiente salto real.
 
 **Próximo paso:** v3 (capa de AI/Claude) es lo siguiente en el roadmap versionado — sin decidir todavía, preguntar antes de asumir.
 

@@ -31,6 +31,14 @@ function render(data) {
     <p class="hint">Temporada actual: ${data.league.season} · ${data.league.totalSeasons} temporada(s) en el historial</p>
   `;
 
+  const weekRecapSection = document.getElementById("week-recap-section");
+  if (data.weekRecap) {
+    weekRecapSection.hidden = false;
+    document.getElementById("week-recap").innerHTML = weekRecapHtml(data.weekRecap);
+  } else {
+    weekRecapSection.hidden = true;
+  }
+
   const narrativesSection = document.getElementById("narratives-section");
   if (data.narratives && data.narratives.length) {
     narrativesSection.hidden = false;
@@ -64,6 +72,38 @@ function render(data) {
 
   document.getElementById("roster-depth").innerHTML = scrollWrap(rosterDepthTable(data.rosterDepth));
   document.getElementById("draft-picks").innerHTML = scrollWrap(draftPicksTable(data.draftPicks));
+}
+
+// Results for the most recently played week, plus two callouts (biggest
+// blowout, closest game) pulled from the same results list — no separate
+// computation, just sorting the same data two different ways.
+function weekRecapHtml(wr) {
+  const matchupLine = (r) => {
+    const aWin = r.teamA.points > r.teamB.points;
+    const bWin = r.teamB.points > r.teamA.points;
+    return `${escapeHtml(r.teamA.displayName)} ${r.teamA.points.toFixed(1)}${aWin ? " 🏆" : ""} - ${r.teamB.points.toFixed(1)}${bWin ? " 🏆" : ""} ${escapeHtml(r.teamB.displayName)}`;
+  };
+
+  const rows = wr.results
+    .map((r) => {
+      const aWin = r.teamA.points > r.teamB.points;
+      const bWin = r.teamB.points > r.teamA.points;
+      return `
+    <div class="matchup-row">
+      <span class="matchup-team ${aWin ? "won" : ""}" data-owner-id="${escapeHtml(r.teamA.ownerId)}">${escapeHtml(r.teamA.displayName)} <b>${r.teamA.points.toFixed(1)}</b></span>
+      <span class="matchup-vs">vs</span>
+      <span class="matchup-team ${bWin ? "won" : ""}" data-owner-id="${escapeHtml(r.teamB.ownerId)}"><b>${r.teamB.points.toFixed(1)}</b> ${escapeHtml(r.teamB.displayName)}</span>
+    </div>`;
+    })
+    .join("");
+
+  return `
+    <p class="hint">Semana ${wr.week} — ${escapeHtml(wr.season)}</p>
+    <div class="week-callout">💥 <b>Golpe de la semana:</b> ${matchupLine(wr.blowout)} (${wr.blowout.margin.toFixed(1)} pts de diferencia)</div>
+    <div class="week-callout">😰 <b>Partido más cerrado:</b> ${matchupLine(wr.tightest)} (${wr.tightest.margin.toFixed(1)} pts de diferencia)</div>
+    <div class="week-results">${rows}</div>
+    <button class="card-trigger-btn" data-card="week" type="button">📤 Compartir resumen</button>
+  `;
 }
 
 const POSITION_COLUMNS = ["QB", "RB", "WR", "TE", "K", "DEF"];
