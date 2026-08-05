@@ -34,6 +34,14 @@ export function getWinnersBracket(leagueId) {
   return fetchJSON(`${BASE}/league/${leagueId}/winners_bracket`);
 }
 
+export function getDrafts(leagueId) {
+  return fetchJSON(`${BASE}/league/${leagueId}/drafts`);
+}
+
+export function getDraftPicks(draftId) {
+  return fetchJSON(`${BASE}/draft/${draftId}/picks`);
+}
+
 // Finds the championship match (p: 1 = "this match decides 1st place") and
 // returns the winning roster_id, or null if the season has no finished
 // bracket yet (in progress / not started).
@@ -237,7 +245,7 @@ const championCache = new Map(); // league_id -> Promise<ownerId|null>
 // Champion ownerId per season in the chain (parallel array to `chain` /
 // `seasonStandings`), cached per league so GOAT and the narrative engine
 // don't each re-fetch the same brackets.
-function getChampionsBySeasonIndex(chain) {
+export function getChampionsBySeasonIndex(chain) {
   return Promise.all(
     chain.map((league) => {
       if (championCache.has(league.league_id)) return championCache.get(league.league_id);
@@ -432,6 +440,111 @@ async function computePlayerNarratives(chain, playersMap) {
   return narratives;
 }
 
+// ---- Draft narratives ---------------------------------------------------
+// Uses the league's own real draft order (Sleeper's pick_no) instead of any
+// external ADP source — "steal"/"bust" is relative to how this specific
+// league actually drafted, which is both more honest and needs no new API.
+const MIN_DRAFT_REGRET = 20; // rank-position gap floor — filters out noise
+
+async function computeDraftNarratives(chain, playersMap) {
+  let bestSteal = null; // { regret, ... }
+  let worstBust = null;
+
+  for (const league of chain) {
+    let draft;
+    try {
+      const drafts = await getDrafts(league.league_id);
+      draft = drafts?.[0];
+    } catch {
+      continue;
+    }
+    if (!draft || draft.status !== "complete") continue; // in-progress / no draft on record
+
+    let picks;
+    try {
+      picks = await getDraftPicks(draft.draft_id);
+    } catch {
+      continue;
+    }
+    const validPicks = (picks || []).filter((p) => p.player_id && p.roster_id != null);
+    if (validPicks.length < 10) continue; // too few picks to rank meaningfully
+
+    const rosterMap = await buildRosterMap(league);
+    const lastWeek = (league.settings?.playoff_week_start || 15) - 1;
+    const weeks = Array.from({ length: Math.max(lastWeek, 0) }, (_, i) => i + 1);
+    const weeklyMatchups = await Promise.all(weeks.map((week) => getMatchupsCached(league.league_id, week)));
+
+    // Points each player produced *for the roster that had them rostered
+    // that week* — this naturally splits credit correctly across a
+    // mid-season trade or drop, since a player who left a roster simply
+    // stops appearing in that roster's weekly `players` list from then on.
+    const valueByRosterPlayer = new Map(); // `${rosterId}:${playerId}` -> points
+    for (const matchups of weeklyMatchups) {
+      if (!matchups) continue;
+      for (const m of matchups) {
+        const points = m.players_points || {};
+        for (const id of m.players || []) {
+          const key = `${m.roster_id}:${id}`;
+          valueByRosterPlayer.set(key, (valueByRosterPlayer.get(key) || 0) + (points[id] || 0));
+        }
+      }
+    }
+
+    const byPickNo = [...validPicks].sort((a, b) => a.pick_no - b.pick_no);
+    const byValue = [...validPicks]
+      .map((p) => ({ ...p, value: valueByRosterPlayer.get(`${p.roster_id}:${p.player_id}`) || 0 }))
+      .sort((a, b) => b.value - a.value);
+
+    const draftRank = new Map(byPickNo.map((p, i) => [`${p.roster_id}:${p.player_id}`, i + 1]));
+    const perfRank = new Map(byValue.map((p, i) => [`${p.roster_id}:${p.player_id}`, i + 1]));
+
+    for (const p of validPicks) {
+      const key = `${p.roster_id}:${p.player_id}`;
+      const dRank = draftRank.get(key);
+      const pRank = perfRank.get(key);
+      if (dRank == null || pRank == null) continue;
+      const owner = rosterMap.get(p.roster_id);
+      if (!owner) continue;
+
+      const regret = dRank - pRank; // positive = outperformed draft slot
+      const entry = {
+        regret,
+        season: league.season,
+        pickNo: p.pick_no,
+        round: p.round,
+        playerId: p.player_id,
+        owner,
+        value: valueByRosterPlayer.get(key) || 0,
+      };
+      if (regret >= MIN_DRAFT_REGRET && (!bestSteal || regret > bestSteal.regret)) bestSteal = entry;
+      if (-regret >= MIN_DRAFT_REGRET && (!worstBust || -regret > -worstBust.regret)) worstBust = entry;
+    }
+  }
+
+  const narratives = [];
+  const playerName = (id) => playersMap.get(id)?.name || `Jugador ${id}`;
+
+  if (bestSteal) {
+    narratives.push({
+      icon: "💎",
+      title: "El Robo del Draft",
+      headline: `${playerName(bestSteal.playerId)} — Ronda ${bestSteal.round}, Pick ${bestSteal.pickNo}`,
+      detail: `${bestSteal.owner.displayName} lo picó tarde en el draft ${bestSteal.season} y produjo ${bestSteal.value.toFixed(1)} pts esa temporada. El mejor valor-por-pick en la historia de la liga.`,
+    });
+  }
+
+  if (worstBust) {
+    narratives.push({
+      icon: "🥴",
+      title: "El Bust",
+      headline: `${playerName(worstBust.playerId)} — Ronda ${worstBust.round}, Pick ${worstBust.pickNo}`,
+      detail: `${worstBust.owner.displayName} lo picó temprano en el draft ${worstBust.season} y solo produjo ${worstBust.value.toFixed(1)} pts esa temporada. El peor retorno de un pick en la historia de la liga.`,
+    });
+  }
+
+  return narratives;
+}
+
 // Turns the same numbers everyone can already see in tables into the kind
 // of storylines a league actually talks about. Every narrative here is a
 // plain rule over data we've already computed — no invented flavor text
@@ -518,6 +631,8 @@ export async function computeNarratives(chain, seasonStandings, h2h, goat, playe
   // need them (or don't want the ~5MB fetch) can simply omit it.
   if (playersMap) {
     narratives.push(...(await computePlayerNarratives(chain, playersMap)));
+    // 7-8. Draft stories (best steal, worst bust) — same playersMap gate.
+    narratives.push(...(await computeDraftNarratives(chain, playersMap)));
   }
 
   return narratives;

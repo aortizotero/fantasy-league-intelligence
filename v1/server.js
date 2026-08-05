@@ -9,6 +9,7 @@ import {
   computeGOAT,
   computeNarratives,
   getPlayersMap,
+  getChampionsBySeasonIndex,
 } from "./lib/sleeper.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -43,6 +44,17 @@ app.get("/api/league/:leagueId", async (req, res) => {
     // parallel with) the calls that produce those.
     const narratives = await computeNarratives(chain, historicalStandings, h2h, goat, playersMap);
 
+    // The actual bracket winner per season — NOT the same as "#1 in the
+    // standings table" (regular-season record and playoff results can
+    // diverge). Parallel array to historicalStandings; null for a season
+    // whose bracket hasn't finished yet (in progress / not started).
+    const championsBySeasonIndex = await getChampionsBySeasonIndex(chain);
+    const champions = historicalStandings.map((s, i) => {
+      const championOwnerId = championsBySeasonIndex[i];
+      if (!championOwnerId) return null;
+      return s.standings.find((line) => line.ownerId === championOwnerId) ?? null;
+    });
+
     res.json({
       league: { name: league.name, season: league.season, totalSeasons: chain.length },
       currentStandings: historicalStandings[historicalStandings.length - 1]?.standings ?? [],
@@ -50,6 +62,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       h2h,
       goat,
       narratives,
+      champions,
     });
   } catch (err) {
     console.error(err);

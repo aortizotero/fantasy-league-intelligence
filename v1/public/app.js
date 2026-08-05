@@ -48,7 +48,14 @@ function render(data) {
       ({ s, i }) => `
       <div class="season-header">
         <h3>${escapeHtml(s.season)}</h3>
-        <button class="card-trigger-btn" data-card="season" data-index="${i}" type="button">📤 Compartir</button>
+        <div class="season-header-actions">
+          ${
+            data.champions[i]
+              ? `<button class="card-trigger-btn" data-card="champion" data-index="${i}" type="button">🏆 Campeón</button>`
+              : ""
+          }
+          <button class="card-trigger-btn" data-card="season" data-index="${i}" type="button">📤 Compartir</button>
+        </div>
       </div>
       ${scrollWrap(standingsTable(s.standings))}`
     )

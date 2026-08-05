@@ -140,6 +140,7 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
   gap: 12px;
 }
 .season-header h3 { margin: 16px 0 0; }
+.season-header-actions { display: flex; gap: 8px; }
 
 .card-trigger-btn {
   padding: 6px 12px;

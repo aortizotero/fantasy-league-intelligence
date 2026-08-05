@@ -60,7 +60,14 @@ Falla con gracia cuando ESPN no tiene el dato: equipos de defensa (ej. "Dallas C
 
 **En vivo:** [storyofmyleague.com](https://storyofmyleague.com) — deploy vía Coolify (self-hosted, VPS propio de Alex) usando `v1/Dockerfile` (Base Directory `/v1`, sin Nixpacks). DNS en GoDaddy (registro A en `@` apuntando al servidor, `www` como CNAME al root). Sin variables de entorno — Sleeper y ESPN son APIs públicas sin auth. SSL automático vía Let's Encrypt (lo maneja Coolify solo).
 
-**Próximo paso:** sin decidir todavía — v3 (capa de AI/Claude) es lo siguiente en el roadmap versionado, pero como con v2, vale la pena preguntar antes de asumir que es lo que sigue.
+**Card de Campeón + narrativas de draft shipped** (post-v2, mismo espíritu de "exprimir lo que ya tenemos antes de saltar a v3"):
+- 5ª stat card: **Campeón de Temporada** — distinta de la card de "resumen de temporada" (que muestra top-3 por récord regular sin afirmar quién ganó, a propósito). Esta sí usa el campeón real del bracket de playoffs (`getChampionsBySeasonIndex`, ya existía internamente para GOAT/narrativas, ahora expuesto en el response del API como `champions[]`, paralelo a `historicalStandings[]`). Botón "🏆 Campeón" solo aparece en temporadas con bracket ya resuelto.
+- Dos narrativas de draft en `computeDraftNarratives` (`lib/sleeper.js`): **"El Robo del Draft"** y **"El Bust"** — usan el draft real de Sleeper (`/v1/league/{id}/drafts` + `/v1/draft/{id}/picks`, `pick_no` real de la liga) cruzado con puntos producidos por jugador *mientras estuvo en el roster que lo draftió* (mismo patrón de acumulación semana-a-semana que "El Peor Banquillo" — reparte el crédito correctamente si el jugador fue tradeado o cortado a media temporada). Sin ADP externo — decisión deliberada, ADP real requeriría una fuente de datos que no tenemos y el ranking por posición-de-pick-vs-posición-de-desempeño dentro de la propia liga es más honesto para este proyecto (100% retrospectivo, no predictivo).
+- Verificado en vivo: Aaron Rodgers (pick 112, ronda 12, 2021) produjo 223.3 pts para `alexcuate` — el mejor robo. Saquon Barkley (pick 5, ronda 1, 2021) solo 97.8 pts para `ferbds` — el peor bust. Ambos coinciden con la realidad de esa temporada (Rodgers MVP, Barkley lesionado).
+
+**Evaluado y pendiente de decisión:** narrativas de trades (cruzar `/v1/league/{id}/transactions/{week}`, tipo `trade`, con puntos producidos post-trade por cada jugador en su nuevo roster) y un selector de "mi equipo" para resaltar/filtrar toda la UI (standings, H2H, narrativas) alrededor de un manager — ambos son puramente frontend/backend con lo que ya tenemos, sin nueva API. Ninguno se ha implementado todavía.
+
+**Próximo paso:** decidir entre narrativas de trades, el selector de "mi equipo", o v3 (capa de AI/Claude) — sin decidir todavía, preguntar antes de asumir.
 
 ## Notas
 

@@ -55,6 +55,11 @@ function buildCardHtml(ds) {
       const s = currentData.historicalStandings[Number(ds.index)];
       return s ? seasonCardHtml(s, leagueName) : null;
     }
+    case "champion": {
+      const c = currentData.champions[Number(ds.index)];
+      const season = currentData.historicalStandings[Number(ds.index)]?.season;
+      return c ? championCardHtml(c, season, leagueName) : null;
+    }
     case "narrative": {
       const n = currentData.narratives[Number(ds.index)];
       return n ? narrativeCardHtml(n, leagueName) : null;
@@ -79,6 +84,19 @@ function goatCardHtml(g, leagueName) {
       <div class="stat-card-stat"><span class="stat-card-num">${g.wins}-${g.losses}${g.ties ? `-${g.ties}` : ""}</span><span class="stat-card-label">Récord</span></div>
       <div class="stat-card-stat"><span class="stat-card-num">${(g.winPct * 100).toFixed(1)}%</span><span class="stat-card-label">Win%</span></div>
       <div class="stat-card-stat"><span class="stat-card-num">${g.seasons}</span><span class="stat-card-label">Temporadas</span></div>
+    </div>
+  `);
+}
+
+function championCardHtml(c, season, leagueName) {
+  return cardShell(`
+    <div class="stat-card-eyebrow">🏆 Campeón ${escapeHtml(season)} — ${escapeHtml(leagueName)}</div>
+    <div class="stat-card-emoji">🏆</div>
+    <div class="stat-card-name">${escapeHtml(c.displayName)}</div>
+    <div class="stat-card-stat-row">
+      <div class="stat-card-stat"><span class="stat-card-num">${c.wins}-${c.losses}${c.ties ? `-${c.ties}` : ""}</span><span class="stat-card-label">Récord</span></div>
+      <div class="stat-card-stat"><span class="stat-card-num">${(c.winPct * 100).toFixed(1)}%</span><span class="stat-card-label">Win%</span></div>
+      <div class="stat-card-stat"><span class="stat-card-num">${c.pointsFor.toFixed(0)}</span><span class="stat-card-label">Puntos</span></div>
     </div>
   `);
 }
