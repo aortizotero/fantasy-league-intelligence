@@ -90,10 +90,13 @@ th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size
 .goat-hero-rings { font-size: 18px; margin: 2px 0; }
 .goat-hero-stats { color: var(--muted); font-size: 13px; }
 
-/* H2H matrix */
+/* H2H matrix (also reused for roster depth) */
 table.matrix th, table.matrix td { text-align: center; white-space: nowrap; }
 table.matrix .row-label { text-align: left; color: var(--text); text-transform: none; font-size: 13px; }
 table.matrix td.diag { color: var(--border); }
+
+/* Highest count in a roster-depth column / positive net draft picks. */
+td.depth-max { color: var(--accent); font-weight: 700; }
 
 /* Narrative cards — the "wow" section, meant to read like a headline, not a
    data row. Distinct treatment from every other card in the app. */

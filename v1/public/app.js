@@ -61,6 +61,54 @@ function render(data) {
       ${scrollWrap(standingsTable(s.standings))}`
     )
     .join("");
+
+  document.getElementById("roster-depth").innerHTML = scrollWrap(rosterDepthTable(data.rosterDepth));
+  document.getElementById("draft-picks").innerHTML = scrollWrap(draftPicksTable(data.draftPicks));
+}
+
+const POSITION_COLUMNS = ["QB", "RB", "WR", "TE", "K", "DEF"];
+
+// One row per manager, one column per position — bolds the single highest
+// count in each column so "who's stacked at RB" is a glance, not a scan.
+function rosterDepthTable(rosterDepth) {
+  if (!rosterDepth || !rosterDepth.length) return "<p class='hint'>Sin datos.</p>";
+
+  const maxByPosition = Object.fromEntries(
+    POSITION_COLUMNS.map((pos) => [pos, Math.max(...rosterDepth.map((r) => r.counts[pos] || 0))])
+  );
+
+  const rows = rosterDepth
+    .map((r) => {
+      const cells = POSITION_COLUMNS.map((pos) => {
+        const count = r.counts[pos] || 0;
+        const isMax = count > 0 && count === maxByPosition[pos];
+        return `<td class="${isMax ? "depth-max" : ""}">${count}</td>`;
+      }).join("");
+      return `<tr data-owner-id="${escapeHtml(r.ownerId)}"><td class="row-label">${escapeHtml(r.displayName)}</td>${cells}<td>${r.total}</td></tr>`;
+    })
+    .join("");
+
+  const header = `<th></th>${POSITION_COLUMNS.map((p) => `<th>${p}</th>`).join("")}<th>Total</th>`;
+  return `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function draftPicksTable(draftPicks) {
+  if (!draftPicks || !draftPicks.length) return "<p class='hint'>Sin datos.</p>";
+  const rows = draftPicks
+    .map((d) => {
+      const detail = [
+        ...d.gained.map((p) => `+${escapeHtml(p.season)} R${p.round}`),
+        ...d.lost.map((p) => `−${escapeHtml(p.season)} R${p.round}`),
+      ].join(", ");
+      return `
+    <tr data-owner-id="${escapeHtml(d.ownerId)}">
+      <td>${escapeHtml(d.displayName)}</td>
+      <td class="${d.netPicks > 0 ? "depth-max" : ""}">${d.netPicks > 0 ? "+" : ""}${d.netPicks}</td>
+      <td class="hint">${detail || "Sin movimientos"}</td>
+    </tr>`;
+    })
+    .join("");
+  return `<table><thead><tr><th>Manager</th><th>Picks Netos</th><th>Detalle</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // Every table on a phone-width screen can still overflow (long names, many

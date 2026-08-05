@@ -10,6 +10,8 @@ import {
   computeNarratives,
   getPlayersMap,
   getChampionsBySeasonIndex,
+  computeRosterDepth,
+  computeDraftPickCapital,
 } from "./lib/sleeper.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -55,6 +57,14 @@ app.get("/api/league/:leagueId", async (req, res) => {
       return s.standings.find((line) => line.ownerId === championOwnerId) ?? null;
     });
 
+    // Roster-building tools — "who's stacked at a position" and "who has
+    // extra draft capital" — both scoped to the *current* league (the one
+    // the user actually entered), not the whole historical chain.
+    const [rosterDepth, draftPicks] = await Promise.all([
+      computeRosterDepth(league, playersMap),
+      computeDraftPickCapital(league),
+    ]);
+
     res.json({
       league: { name: league.name, season: league.season, totalSeasons: chain.length },
       currentStandings: historicalStandings[historicalStandings.length - 1]?.standings ?? [],
@@ -63,6 +73,8 @@ app.get("/api/league/:leagueId", async (req, res) => {
       goat,
       narratives,
       champions,
+      rosterDepth,
+      draftPicks,
     });
   } catch (err) {
     console.error(err);

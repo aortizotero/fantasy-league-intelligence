@@ -69,7 +69,12 @@ Falla con gracia cuando ESPN no tiene el dato: equipos de defensa (ej. "Dallas C
 
 **Narrativa de trades shipped** — `computeTradeNarratives` en `lib/sleeper.js`: cruza `/v1/league/{id}/transactions/{week}` (tipo `trade`, status `complete`) con el mismo cálculo de "puntos producidos por jugador en el roster que lo tiene" que ya usaba la narrativa de draft. Encuentra el trade 2-equipos, solo-jugadores (sin picks ni FAAB de por medio, para que la comparación sea justa) más desigual de la historia de la liga, comparando cuánto produjo cada lado de lo que recibió. Verificado en vivo: JorgeGBXI le ganó un trade a Fedesalazar10 en 2023 — recibió a Courtland Sutton + DeVonta Smith (305.6 pts) a cambio de Matthew Stafford (191.3 pts), 114.3 pts de diferencia.
 
-Con esto la liga ya tiene 9 narrativas automáticas y 5 tipos de stat card — probablemente el punto natural para pausar el "exprimir lo que ya tenemos" y decidir el siguiente salto real.
+**Herramientas de roster shipped** — dos secciones nuevas, no narrativas sino datos accionables ("a quién le ofrezco un trade"):
+- **Profundidad de Roster** (`computeRosterDepth`): cuenta jugadores por posición (QB/RB/WR/TE/K/DEF) del roster *actual* de cada manager, cruzando `roster.players` (ya lo trae `/v1/league/{id}/rosters`) con `playersMap`. La celda más alta de cada columna se resalta — así se ve de un vistazo quién está stacked en una posición.
+- **Capital de Draft** (`computeDraftPickCapital`): usa `/v1/league/{id}/traded_picks` para calcular picks netos ganados/perdidos por trade (no reconstruye el inventario completo del draft, solo el diff vs. lo que cada quien tendría "de forma natural" — un pick nunca tradeado simplemente no aparece en la lista). Verificado que la suma neta de toda la liga da exactamente 0 (zero-sum, como debe ser en un intercambio de picks).
+- Ambas reusan el `data-owner-id` del selector "Mi equipo", así que también se resaltan solas si seleccionas tu equipo.
+
+Con esto la liga ya tiene 9 narrativas automáticas, 5 tipos de stat card, y 2 herramientas de roster — probablemente el punto natural para pausar el "exprimir lo que ya tenemos" y decidir el siguiente salto real.
 
 **Próximo paso:** v3 (capa de AI/Claude) es lo siguiente en el roadmap versionado — sin decidir todavía, preguntar antes de asumir.
 

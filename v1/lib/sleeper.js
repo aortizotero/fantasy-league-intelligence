@@ -48,6 +48,10 @@ export function getTransactions(leagueId, week) {
   return fetchJSON(`${BASE}/league/${leagueId}/transactions/${week}`);
 }
 
+export function getTradedPicks(leagueId) {
+  return fetchJSON(`${BASE}/league/${leagueId}/traded_picks`);
+}
+
 // Finds the championship match (p: 1 = "this match decides 1st place") and
 // returns the winning roster_id, or null if the season has no finished
 // bracket yet (in progress / not started).
@@ -316,6 +320,62 @@ export async function computeGOAT(chain, seasonStandings) {
   // season record. Wins and win% are the tiebreakers among equally-ringed managers.
   career.sort((a, b) => b.championships - a.championships || b.wins - a.wins || b.winPct - a.winPct);
   return career;
+}
+
+const POSITION_COLUMNS = ["QB", "RB", "WR", "TE", "K", "DEF"];
+
+// Current roster composition per manager — who's stacked at a position (a
+// trade target) and who's thin. Uses the *current* season's rosters only
+// (this is about "right now", not history), cross-referenced with
+// playersMap for each player's position.
+export async function computeRosterDepth(currentLeague, playersMap) {
+  const rosterMap = await buildRosterMap(currentLeague);
+
+  return [...rosterMap.values()].map(({ ownerId, displayName, roster }) => {
+    const counts = Object.fromEntries(POSITION_COLUMNS.map((p) => [p, 0]));
+    let other = 0;
+    for (const playerId of roster.players || []) {
+      const position = playersMap.get(playerId)?.position;
+      if (position && counts[position] != null) counts[position] += 1;
+      else other += 1;
+    }
+    const total = Object.values(counts).reduce((a, b) => a + b, 0) + other;
+    return { ownerId, displayName, counts, other, total };
+  });
+}
+
+// Net future draft-pick capital per manager — how many MORE or FEWER picks
+// they hold than their own natural one-per-round allotment, after every
+// pick trade on record. A pick that was never traded simply never shows up
+// in Sleeper's traded_picks list (it's still with its original owner by
+// default), so this is a diff, not a full draft-inventory reconstruction.
+export async function computeDraftPickCapital(currentLeague) {
+  const rosterMap = await buildRosterMap(currentLeague);
+  let tradedPicks;
+  try {
+    tradedPicks = await getTradedPicks(currentLeague.league_id);
+  } catch {
+    tradedPicks = [];
+  }
+
+  const netByRoster = new Map(); // roster_id -> { gained: [], lost: [] }
+  const ensure = (rosterId) => {
+    if (!netByRoster.has(rosterId)) netByRoster.set(rosterId, { gained: [], lost: [] });
+    return netByRoster.get(rosterId);
+  };
+
+  for (const p of tradedPicks || []) {
+    if (p.owner_id === p.roster_id) continue; // traded away and back — nets to zero
+    ensure(p.owner_id).gained.push({ season: p.season, round: p.round });
+    ensure(p.roster_id).lost.push({ season: p.season, round: p.round });
+  }
+
+  return [...rosterMap.values()]
+    .map(({ ownerId, displayName, roster }) => {
+      const { gained, lost } = netByRoster.get(roster.roster_id) || { gained: [], lost: [] };
+      return { ownerId, displayName, netPicks: gained.length - lost.length, gained, lost };
+    })
+    .sort((a, b) => b.netPicks - a.netPicks);
 }
 
 // ---- Player-level narratives (v2) --------------------------------------
