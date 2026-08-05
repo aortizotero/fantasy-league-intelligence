@@ -42,6 +42,12 @@ export function getDraftPicks(draftId) {
   return fetchJSON(`${BASE}/draft/${draftId}/picks`);
 }
 
+// `round` here is actually the week number, per Sleeper's (slightly
+// misleadingly named) endpoint.
+export function getTransactions(leagueId, week) {
+  return fetchJSON(`${BASE}/league/${leagueId}/transactions/${week}`);
+}
+
 // Finds the championship match (p: 1 = "this match decides 1st place") and
 // returns the winning roster_id, or null if the season has no finished
 // bracket yet (in progress / not started).
@@ -545,6 +551,97 @@ async function computeDraftNarratives(chain, playersMap) {
   return narratives;
 }
 
+// ---- Trade narratives ----------------------------------------------------
+// Finds the single most lopsided 2-team, players-only trade in the league's
+// history, by comparing how many points each side's newly-acquired players
+// went on to produce *for the roster that received them* — same
+// per-roster-per-week point accumulation as the draft narratives above, so
+// a player traded again later (or dropped) naturally stops accruing value
+// for a roster the moment they leave it.
+const MIN_TRADE_VALUE_GAP = 30; // points — filters out roughly-even trades
+
+async function computeTradeNarratives(chain, playersMap) {
+  let mostLopsided = null; // { gap, season, winner: {owner, players, value}, loser: {...} }
+
+  for (const league of chain) {
+    const rosterMap = await buildRosterMap(league);
+    const lastWeek = (league.settings?.playoff_week_start || 15) - 1;
+    const weeks = Array.from({ length: Math.max(lastWeek, 0) }, (_, i) => i + 1);
+
+    const weeklyMatchups = await Promise.all(weeks.map((week) => getMatchupsCached(league.league_id, week)));
+    const valueByRosterPlayer = new Map(); // `${rosterId}:${playerId}` -> points
+    for (const matchups of weeklyMatchups) {
+      if (!matchups) continue;
+      for (const m of matchups) {
+        const points = m.players_points || {};
+        for (const id of m.players || []) {
+          const key = `${m.roster_id}:${id}`;
+          valueByRosterPlayer.set(key, (valueByRosterPlayer.get(key) || 0) + (points[id] || 0));
+        }
+      }
+    }
+
+    let weeklyTransactions;
+    try {
+      weeklyTransactions = await Promise.all(weeks.map((week) => getTransactions(league.league_id, week)));
+    } catch {
+      continue;
+    }
+
+    for (const transactions of weeklyTransactions) {
+      if (!transactions) continue;
+      for (const t of transactions) {
+        if (t.type !== "trade" || t.status !== "complete") continue;
+        // Picks/FAAB carry value our points-only metric can't see — skip
+        // anything but a clean players-for-players trade to keep the
+        // comparison honest rather than mislabeling a fair trade as lopsided.
+        if (t.draft_picks?.length || t.waiver_budget?.length) continue;
+        if (!t.adds || Object.keys(t.adds).length < 2) continue;
+
+        const sides = new Map(); // rosterId -> playerId[]
+        for (const [playerId, rosterId] of Object.entries(t.adds)) {
+          if (!sides.has(rosterId)) sides.set(rosterId, []);
+          sides.get(rosterId).push(playerId);
+        }
+        if (sides.size !== 2) continue; // only straightforward 2-team trades
+
+        const [[rosterA, playersA], [rosterB, playersB]] = [...sides.entries()];
+        const ownerA = rosterMap.get(Number(rosterA));
+        const ownerB = rosterMap.get(Number(rosterB));
+        if (!ownerA || !ownerB) continue;
+
+        const valueA = playersA.reduce((sum, id) => sum + (valueByRosterPlayer.get(`${rosterA}:${id}`) || 0), 0);
+        const valueB = playersB.reduce((sum, id) => sum + (valueByRosterPlayer.get(`${rosterB}:${id}`) || 0), 0);
+        const gap = Math.abs(valueA - valueB);
+        if (gap < MIN_TRADE_VALUE_GAP) continue;
+
+        const winnerIsA = valueA >= valueB;
+        const entry = {
+          gap,
+          season: league.season,
+          winner: { owner: winnerIsA ? ownerA : ownerB, players: winnerIsA ? playersA : playersB, value: winnerIsA ? valueA : valueB },
+          loser: { owner: winnerIsA ? ownerB : ownerA, players: winnerIsA ? playersB : playersA, value: winnerIsA ? valueB : valueA },
+        };
+        if (!mostLopsided || gap > mostLopsided.gap) mostLopsided = entry;
+      }
+    }
+  }
+
+  if (!mostLopsided) return [];
+
+  const playerName = (id) => playersMap.get(id)?.name || `Jugador ${id}`;
+  const namesOf = (ids) => ids.map(playerName).join(", ");
+
+  return [
+    {
+      icon: "🔄",
+      title: "El Trade Más Lopsided",
+      headline: `${mostLopsided.winner.owner.displayName} le ganó el trade a ${mostLopsided.loser.owner.displayName}`,
+      detail: `${mostLopsided.season}: ${mostLopsided.winner.owner.displayName} recibió a ${namesOf(mostLopsided.winner.players)} (${mostLopsided.winner.value.toFixed(1)} pts producidos después del trade) a cambio de ${namesOf(mostLopsided.loser.players)} (${mostLopsided.loser.value.toFixed(1)} pts). ${mostLopsided.gap.toFixed(1)} puntos de diferencia — el trade más desigual en la historia de la liga.`,
+    },
+  ];
+}
+
 // Turns the same numbers everyone can already see in tables into the kind
 // of storylines a league actually talks about. Every narrative here is a
 // plain rule over data we've already computed — no invented flavor text
@@ -633,6 +730,8 @@ export async function computeNarratives(chain, seasonStandings, h2h, goat, playe
     narratives.push(...(await computePlayerNarratives(chain, playersMap)));
     // 7-8. Draft stories (best steal, worst bust) — same playersMap gate.
     narratives.push(...(await computeDraftNarratives(chain, playersMap)));
+    // 9. Most lopsided trade — same playersMap gate.
+    narratives.push(...(await computeTradeNarratives(chain, playersMap)));
   }
 
   return narratives;
