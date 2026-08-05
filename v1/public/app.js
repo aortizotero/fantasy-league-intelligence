@@ -17,6 +17,7 @@ form.addEventListener("submit", async (e) => {
 
     render(data);
     if (window.initCards) window.initCards(data);
+    if (window.initMyTeam) window.initMyTeam(data, leagueId);
     statusEl.textContent = "";
     results.hidden = false;
   } catch (err) {
@@ -74,7 +75,7 @@ function standingsTable(standings) {
   const rows = standings
     .map(
       (s, i) => `
-    <tr>
+    <tr data-owner-id="${escapeHtml(s.ownerId)}">
       <td>${i + 1}</td>
       <td>${escapeHtml(s.displayName)}</td>
       <td>${s.wins}-${s.losses}${s.ties ? `-${s.ties}` : ""}</td>
@@ -112,7 +113,7 @@ function goatCard(goat) {
   const restRows = rest
     .map(
       (g, i) => `
-    <tr class="card-trigger-row" data-card="goat" data-index="${i + 1}" title="Compartir el ranking de ${escapeHtml(g.displayName)}">
+    <tr class="card-trigger-row" data-card="goat" data-index="${i + 1}" data-owner-id="${escapeHtml(g.ownerId)}" title="Compartir el ranking de ${escapeHtml(g.displayName)}">
       <td>${i + 2}</td>
       <td>${escapeHtml(g.displayName)}</td>
       <td>${g.championships > 0 ? "🏆".repeat(g.championships) : "—"}</td>
@@ -124,7 +125,7 @@ function goatCard(goat) {
     .join("");
 
   return `
-    <div class="goat-hero card-trigger-row" data-card="goat" data-index="0" title="Compartir el GOAT de la liga">
+    <div class="goat-hero card-trigger-row" data-card="goat" data-index="0" data-owner-id="${escapeHtml(champion.ownerId)}" title="Compartir el GOAT de la liga">
       <div class="goat-hero-emoji">🐐</div>
       <div>
         <div class="goat-hero-name">${escapeHtml(champion.displayName)}</div>
@@ -150,7 +151,7 @@ function h2hMatrix(h2h, goat) {
   }
 
   const abbrevById = uniqueAbbreviations(managers);
-  const header = `<th></th>${managers.map((m) => `<th title="${escapeHtml(m.displayName)}">${escapeHtml(abbrevById.get(m.ownerId))}</th>`).join("")}`;
+  const header = `<th></th>${managers.map((m) => `<th data-owner-id="${escapeHtml(m.ownerId)}" title="${escapeHtml(m.displayName)}">${escapeHtml(abbrevById.get(m.ownerId))}</th>`).join("")}`;
   const rows = managers
     .map((rowMgr) => {
       const cells = managers
@@ -161,7 +162,7 @@ function h2hMatrix(h2h, goat) {
           return `<td class="card-trigger-cell" data-card="h2h" data-a-name="${escapeHtml(rowMgr.displayName)}" data-b-name="${escapeHtml(colMgr.displayName)}" data-record="${escapeHtml(record)}" title="Compartir este head-to-head">${record}</td>`;
         })
         .join("");
-      return `<tr><th class="row-label">${escapeHtml(rowMgr.displayName)}</th>${cells}</tr>`;
+      return `<tr data-owner-id="${escapeHtml(rowMgr.ownerId)}"><th class="row-label">${escapeHtml(rowMgr.displayName)}</th>${cells}</tr>`;
     })
     .join("");
 

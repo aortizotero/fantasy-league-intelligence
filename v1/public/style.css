@@ -274,6 +274,35 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
 }
 .stat-card { position: relative; }
 
+/* ---- "Mi equipo" selector + highlighting --------------------------- */
+#my-team-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#my-team-section label { font-weight: 600; }
+#my-team-section .hint { margin: 0; flex-basis: 100%; }
+#my-team-select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* Applied to any [data-owner-id] row/cell matching the selected manager. */
+tr.is-me { background: rgba(0, 196, 106, 0.14); }
+tr.is-me td:first-child, tr.is-me th.row-label { box-shadow: inset 3px 0 0 var(--accent); }
+th.is-me { color: var(--accent); }
+.goat-hero.is-me { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+.narrative-card.mentions-me {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 196, 106, 0.4);
+}
+
 @media (max-width: 480px) {
   body { padding: 20px 12px 60px; }
   #league-form { flex-direction: column; max-width: 100%; }
