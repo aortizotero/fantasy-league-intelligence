@@ -24,11 +24,17 @@ app.use(express.static(path.join(__dirname, "public")));
 // Everything a league needs in one call: current standings, full season
 // history, head-to-head records, and career (GOAT) rankings.
 app.get("/api/league/:leagueId", async (req, res) => {
+  const lang = req.query.lang === "es" ? "es" : "en";
+  const errors = {
+    en: { notFound: "League not found. Check the League ID.", loadFailed: "Couldn't load the league. " },
+    es: { notFound: "Liga no encontrada. Revisa el League ID.", loadFailed: "No se pudo cargar la liga. " },
+  }[lang];
+
   try {
     const { leagueId } = req.params;
     const league = await getLeague(leagueId);
     if (!league) {
-      return res.status(404).json({ error: "Liga no encontrada. Revisa el League ID." });
+      return res.status(404).json({ error: errors.notFound });
     }
 
     const chain = await getLeagueChain(leagueId);
@@ -45,7 +51,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
     ]);
     // Narratives are derived FROM h2h + goat, so they run after (not in
     // parallel with) the calls that produce those.
-    const narratives = await computeNarratives(chain, historicalStandings, h2h, goat, playersMap);
+    const narratives = await computeNarratives(chain, historicalStandings, h2h, goat, playersMap, lang);
 
     // The actual bracket winner per season — NOT the same as "#1 in the
     // standings table" (regular-season record and playoff results can
@@ -81,10 +87,10 @@ app.get("/api/league/:leagueId", async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "No se pudo cargar la liga. " + err.message });
+    res.status(500).json({ error: errors.loadFailed + err.message });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`Fantasy League Intelligence corriendo en http://localhost:${PORT}`);
+  console.log(`Fantasy League Intelligence running at http://localhost:${PORT}`);
 });

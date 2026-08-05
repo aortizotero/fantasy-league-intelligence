@@ -19,7 +19,7 @@ window.initMyTeam = function initMyTeam(data, leagueId) {
   const options = data.goat
     .map((g) => `<option value="${escapeHtml(g.ownerId)}">${escapeHtml(g.displayName)}</option>`)
     .join("");
-  select.innerHTML = `<option value="">— Selecciona tu equipo —</option>${options}`;
+  select.innerHTML = `<option value="">${escapeHtml(t("myTeamPlaceholder"))}</option>${options}`;
 
   const saved = localStorage.getItem(storageKey(leagueId)) || "";
   select.value = saved;
@@ -83,25 +83,13 @@ function renderRivalries(ownerId) {
 
   if (result?.nemesis) {
     const n = result.nemesis;
-    cards.push(
-      rivalryCardHtml(
-        "🧟",
-        "Tu Némesis",
-        n.rival.displayName,
-        `${n.myWins}-${n.theirWins}${n.ties ? `-${n.ties}` : ""} de por vida contra ${n.rival.displayName}. Tu peor matchup histórico.`
-      )
-    );
+    const record = `${n.myWins}-${n.theirWins}${n.ties ? `-${n.ties}` : ""}`;
+    cards.push(rivalryCardHtml("🧟", t("nemesisTitle"), n.rival.displayName, t("nemesisDetail", record, n.rival.displayName)));
   }
   if (result?.victim) {
     const v = result.victim;
-    cards.push(
-      rivalryCardHtml(
-        "😈",
-        "Tu Víctima",
-        v.rival.displayName,
-        `${v.myWins}-${v.theirWins}${v.ties ? `-${v.ties}` : ""} de por vida contra ${v.rival.displayName}. Al que siempre le ganas.`
-      )
-    );
+    const record = `${v.myWins}-${v.theirWins}${v.ties ? `-${v.ties}` : ""}`;
+    cards.push(rivalryCardHtml("😈", t("victimTitle"), v.rival.displayName, t("victimDetail", record, v.rival.displayName)));
   }
 
   if (!cards.length) {
@@ -120,7 +108,7 @@ function rivalryCardHtml(icon, title, headline, detail) {
       <div class="narrative-title">${escapeHtml(title)}</div>
       <div class="narrative-headline">${escapeHtml(headline)}</div>
       <div class="narrative-detail">${escapeHtml(detail)}</div>
-      <button class="card-trigger-btn" data-card="personal" data-icon="${escapeHtml(icon)}" data-title="${escapeHtml(title)}" data-headline="${escapeHtml(headline)}" data-detail="${escapeHtml(detail)}" type="button">📤 Compartir</button>
+      <button class="card-trigger-btn" data-card="personal" data-icon="${escapeHtml(icon)}" data-title="${escapeHtml(title)}" data-headline="${escapeHtml(headline)}" data-detail="${escapeHtml(detail)}" type="button">${t("share")}</button>
     </div>`;
 }
 

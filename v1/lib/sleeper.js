@@ -469,7 +469,8 @@ const MIN_BENCH_REGRET = 5; // points — filters out trivial, not-a-real-story 
 // same cached weekly matchups computeH2H already fetched via
 // getMatchupsCached, so this costs zero extra network calls when narratives
 // run after H2H (which server.js already guarantees).
-async function computePlayerNarratives(chain, playersMap) {
+async function computePlayerNarratives(chain, playersMap, lang) {
+  const tr = (en, es) => (lang === "es" ? es : en);
   let bestWeek = null; // { points, playerId, season, week, owner }
   let worstBenchCall = null; // { regret, ... }
 
@@ -528,7 +529,7 @@ async function computePlayerNarratives(chain, playersMap) {
   }
 
   const narratives = [];
-  const playerName = (id) => playersMap.get(id)?.name || `Jugador ${id}`;
+  const playerName = (id) => playersMap.get(id)?.name || tr(`Player ${id}`, `Jugador ${id}`);
   // Real stat lines (yards, TDs, etc.) from ESPN — a nice-to-have layer on
   // top of the Sleeper-only points/starters mechanic above. Any failure
   // here (unknown espn_id, team defense, API hiccup) just means the
@@ -539,9 +540,12 @@ async function computePlayerNarratives(chain, playersMap) {
     const line = await statLine(bestWeek.playerId, bestWeek.season, bestWeek.week);
     narratives.push({
       icon: "🚀",
-      title: "La Actuación del Año",
+      title: tr("Performance of the Year", "La Actuación del Año"),
       headline: `${playerName(bestWeek.playerId)} — ${bestWeek.points.toFixed(1)} pts`,
-      detail: `Semana ${bestWeek.week}, ${bestWeek.season}, en el roster titular de ${bestWeek.owner.displayName}.${line ? ` ${line}.` : ""} La mejor semana individual en la historia de la liga.`,
+      detail: tr(
+        `Week ${bestWeek.week}, ${bestWeek.season}, starting for ${bestWeek.owner.displayName}.${line ? ` ${line}.` : ""} The best individual week in league history.`,
+        `Semana ${bestWeek.week}, ${bestWeek.season}, en el roster titular de ${bestWeek.owner.displayName}.${line ? ` ${line}.` : ""} La mejor semana individual en la historia de la liga.`
+      ),
     });
   }
 
@@ -552,9 +556,12 @@ async function computePlayerNarratives(chain, playersMap) {
     ]);
     narratives.push({
       icon: "🪑",
-      title: "El Peor Banquillo",
+      title: tr("The Worst Bench Call", "El Peor Banquillo"),
       headline: worstBenchCall.owner.displayName,
-      detail: `Semana ${worstBenchCall.week}, ${worstBenchCall.season}: tituló a ${playerName(worstBenchCall.starterId)} (${worstBenchCall.starterPts.toFixed(1)} pts${starterLine ? ` — ${starterLine}` : ""}) con ${playerName(worstBenchCall.benchedId)} (${worstBenchCall.benchedPts.toFixed(1)} pts${benchLine ? ` — ${benchLine}` : ""}) sentado en la banca. ${worstBenchCall.regret.toFixed(1)} puntos perdidos por la alineación.`,
+      detail: tr(
+        `Week ${worstBenchCall.week}, ${worstBenchCall.season}: started ${playerName(worstBenchCall.starterId)} (${worstBenchCall.starterPts.toFixed(1)} pts${starterLine ? ` — ${starterLine}` : ""}) while ${playerName(worstBenchCall.benchedId)} (${worstBenchCall.benchedPts.toFixed(1)} pts${benchLine ? ` — ${benchLine}` : ""}) sat on the bench. ${worstBenchCall.regret.toFixed(1)} points lost to the lineup.`,
+        `Semana ${worstBenchCall.week}, ${worstBenchCall.season}: tituló a ${playerName(worstBenchCall.starterId)} (${worstBenchCall.starterPts.toFixed(1)} pts${starterLine ? ` — ${starterLine}` : ""}) con ${playerName(worstBenchCall.benchedId)} (${worstBenchCall.benchedPts.toFixed(1)} pts${benchLine ? ` — ${benchLine}` : ""}) sentado en la banca. ${worstBenchCall.regret.toFixed(1)} puntos perdidos por la alineación.`
+      ),
     });
   }
 
@@ -567,7 +574,8 @@ async function computePlayerNarratives(chain, playersMap) {
 // league actually drafted, which is both more honest and needs no new API.
 const MIN_DRAFT_REGRET = 20; // rank-position gap floor — filters out noise
 
-async function computeDraftNarratives(chain, playersMap) {
+async function computeDraftNarratives(chain, playersMap, lang) {
+  const tr = (en, es) => (lang === "es" ? es : en);
   let bestSteal = null; // { regret, ... }
   let worstBust = null;
 
@@ -643,23 +651,29 @@ async function computeDraftNarratives(chain, playersMap) {
   }
 
   const narratives = [];
-  const playerName = (id) => playersMap.get(id)?.name || `Jugador ${id}`;
+  const playerName = (id) => playersMap.get(id)?.name || tr(`Player ${id}`, `Jugador ${id}`);
 
   if (bestSteal) {
     narratives.push({
       icon: "💎",
-      title: "El Robo del Draft",
-      headline: `${playerName(bestSteal.playerId)} — Ronda ${bestSteal.round}, Pick ${bestSteal.pickNo}`,
-      detail: `${bestSteal.owner.displayName} lo picó tarde en el draft ${bestSteal.season} y produjo ${bestSteal.value.toFixed(1)} pts esa temporada. El mejor valor-por-pick en la historia de la liga.`,
+      title: tr("The Draft Steal", "El Robo del Draft"),
+      headline: `${playerName(bestSteal.playerId)} — ${tr("Round", "Ronda")} ${bestSteal.round}, Pick ${bestSteal.pickNo}`,
+      detail: tr(
+        `${bestSteal.owner.displayName} picked him late in the ${bestSteal.season} draft and he produced ${bestSteal.value.toFixed(1)} pts that season. The best value-per-pick in league history.`,
+        `${bestSteal.owner.displayName} lo picó tarde en el draft ${bestSteal.season} y produjo ${bestSteal.value.toFixed(1)} pts esa temporada. El mejor valor-por-pick en la historia de la liga.`
+      ),
     });
   }
 
   if (worstBust) {
     narratives.push({
       icon: "🥴",
-      title: "El Bust",
-      headline: `${playerName(worstBust.playerId)} — Ronda ${worstBust.round}, Pick ${worstBust.pickNo}`,
-      detail: `${worstBust.owner.displayName} lo picó temprano en el draft ${worstBust.season} y solo produjo ${worstBust.value.toFixed(1)} pts esa temporada. El peor retorno de un pick en la historia de la liga.`,
+      title: tr("The Bust", "El Bust"),
+      headline: `${playerName(worstBust.playerId)} — ${tr("Round", "Ronda")} ${worstBust.round}, Pick ${worstBust.pickNo}`,
+      detail: tr(
+        `${worstBust.owner.displayName} picked him early in the ${worstBust.season} draft and he only produced ${worstBust.value.toFixed(1)} pts that season. The worst return on a pick in league history.`,
+        `${worstBust.owner.displayName} lo picó temprano en el draft ${worstBust.season} y solo produjo ${worstBust.value.toFixed(1)} pts esa temporada. El peor retorno de un pick en la historia de la liga.`
+      ),
     });
   }
 
@@ -675,7 +689,8 @@ async function computeDraftNarratives(chain, playersMap) {
 // for a roster the moment they leave it.
 const MIN_TRADE_VALUE_GAP = 30; // points — filters out roughly-even trades
 
-async function computeTradeNarratives(chain, playersMap) {
+async function computeTradeNarratives(chain, playersMap, lang) {
+  const tr = (en, es) => (lang === "es" ? es : en);
   let mostLopsided = null; // { gap, season, winner: {owner, players, value}, loser: {...} }
 
   for (const league of chain) {
@@ -744,15 +759,21 @@ async function computeTradeNarratives(chain, playersMap) {
 
   if (!mostLopsided) return [];
 
-  const playerName = (id) => playersMap.get(id)?.name || `Jugador ${id}`;
+  const playerName = (id) => playersMap.get(id)?.name || tr(`Player ${id}`, `Jugador ${id}`);
   const namesOf = (ids) => ids.map(playerName).join(", ");
 
   return [
     {
       icon: "🔄",
-      title: "El Trade Más Lopsided",
-      headline: `${mostLopsided.winner.owner.displayName} le ganó el trade a ${mostLopsided.loser.owner.displayName}`,
-      detail: `${mostLopsided.season}: ${mostLopsided.winner.owner.displayName} recibió a ${namesOf(mostLopsided.winner.players)} (${mostLopsided.winner.value.toFixed(1)} pts producidos después del trade) a cambio de ${namesOf(mostLopsided.loser.players)} (${mostLopsided.loser.value.toFixed(1)} pts). ${mostLopsided.gap.toFixed(1)} puntos de diferencia — el trade más desigual en la historia de la liga.`,
+      title: tr("The Most Lopsided Trade", "El Trade Más Lopsided"),
+      headline: tr(
+        `${mostLopsided.winner.owner.displayName} won a trade against ${mostLopsided.loser.owner.displayName}`,
+        `${mostLopsided.winner.owner.displayName} le ganó el trade a ${mostLopsided.loser.owner.displayName}`
+      ),
+      detail: tr(
+        `${mostLopsided.season}: ${mostLopsided.winner.owner.displayName} got ${namesOf(mostLopsided.winner.players)} (${mostLopsided.winner.value.toFixed(1)} pts produced after the trade) for ${namesOf(mostLopsided.loser.players)} (${mostLopsided.loser.value.toFixed(1)} pts). A ${mostLopsided.gap.toFixed(1)}-point gap — the most unequal trade in league history.`,
+        `${mostLopsided.season}: ${mostLopsided.winner.owner.displayName} recibió a ${namesOf(mostLopsided.winner.players)} (${mostLopsided.winner.value.toFixed(1)} pts producidos después del trade) a cambio de ${namesOf(mostLopsided.loser.players)} (${mostLopsided.loser.value.toFixed(1)} pts). ${mostLopsided.gap.toFixed(1)} puntos de diferencia — el trade más desigual en la historia de la liga.`
+      ),
     },
   ];
 }
@@ -763,24 +784,28 @@ async function computeTradeNarratives(chain, playersMap) {
 // stapled onto a stat, and nothing shows up unless the underlying data
 // actually supports it (small sample sizes are filtered out rather than
 // forced into a narrative).
-export async function computeNarratives(chain, seasonStandings, h2h, goat, playersMap) {
+export async function computeNarratives(chain, seasonStandings, h2h, goat, playersMap, lang = "en") {
+  const tr = (en, es) => (lang === "es" ? es : en);
   const narratives = [];
   const MIN_CAREER_GAMES = 15; // enough seasons for "best record" to mean something
   const MIN_RIVALRY_GAMES = 5; // enough matchups for a rivalry to be real, not noise
 
-  // 1. La Maldición — best career record among managers with zero rings.
+  // 1. La Maldición / The Curse — best career record among managers with zero rings.
   const ringless = goat.filter((g) => g.championships === 0 && g.wins + g.losses + g.ties >= MIN_CAREER_GAMES);
   if (ringless.length > 0) {
     const cursed = ringless.reduce((best, g) => (g.winPct > best.winPct ? g : best));
     narratives.push({
       icon: "😤",
-      title: "La Maldición",
+      title: tr("The Curse", "La Maldición"),
       headline: cursed.displayName,
-      detail: `El mejor récord histórico de la liga (${cursed.wins}-${cursed.losses}${cursed.ties ? `-${cursed.ties}` : ""}, ${(cursed.winPct * 100).toFixed(1)}%) y cero campeonatos. Favorito todos los años, campeón ninguno.`,
+      detail: tr(
+        `The best regular-season record in league history (${cursed.wins}-${cursed.losses}${cursed.ties ? `-${cursed.ties}` : ""}, ${(cursed.winPct * 100).toFixed(1)}%) and zero championships. Favorite every year, champion of none.`,
+        `El mejor récord histórico de la liga (${cursed.wins}-${cursed.losses}${cursed.ties ? `-${cursed.ties}` : ""}, ${(cursed.winPct * 100).toFixed(1)}%) y cero campeonatos. Favorito todos los años, campeón ninguno.`
+      ),
     });
   }
 
-  // 2. El Verdugo — the single most lopsided rivalry in the league's history.
+  // 2. El Verdugo / The Executioner — the single most lopsided rivalry in the league's history.
   const realRivalries = h2h.filter((r) => r.aWins + r.bWins + r.ties >= MIN_RIVALRY_GAMES);
   if (realRivalries.length > 0) {
     const mostLopsided = realRivalries.reduce((best, r) =>
@@ -792,13 +817,16 @@ export async function computeNarratives(chain, seasonStandings, h2h, goat, playe
     const winsAgainst = Math.min(mostLopsided.aWins, mostLopsided.bWins);
     narratives.push({
       icon: "🔨",
-      title: "El Verdugo",
-      headline: `${dominant.displayName} domina a ${dominated.displayName}`,
-      detail: `${winsFor}-${winsAgainst}${mostLopsided.ties ? `-${mostLopsided.ties}` : ""} de por vida. La rivalidad más pareja... para uno solo de los dos.`,
+      title: tr("The Executioner", "El Verdugo"),
+      headline: tr(`${dominant.displayName} dominates ${dominated.displayName}`, `${dominant.displayName} domina a ${dominated.displayName}`),
+      detail: tr(
+        `${winsFor}-${winsAgainst}${mostLopsided.ties ? `-${mostLopsided.ties}` : ""} all-time. The most one-sided rivalry in the league... for one of them, anyway.`,
+        `${winsFor}-${winsAgainst}${mostLopsided.ties ? `-${mostLopsided.ties}` : ""} de por vida. La rivalidad más pareja... para uno solo de los dos.`
+      ),
     });
   }
 
-  // 3. La Presa Eterna — someone who has never once beaten a specific rival.
+  // 3. La Presa Eterna / The Eternal Prey — someone who has never once beaten a specific rival.
   const neverWon = h2h
     .flatMap((r) => {
       const entries = [];
@@ -811,13 +839,19 @@ export async function computeNarratives(chain, seasonStandings, h2h, goat, playe
     const worst = neverWon[0];
     narratives.push({
       icon: "👻",
-      title: "La Presa Eterna",
-      headline: `${worst.loser.displayName} nunca le ha ganado a ${worst.winner.displayName}`,
-      detail: `0-${worst.losses}${worst.ties ? `-${worst.ties}` : ""} de por vida. Ni una sola vez.`,
+      title: tr("The Eternal Prey", "La Presa Eterna"),
+      headline: tr(
+        `${worst.loser.displayName} has never beaten ${worst.winner.displayName}`,
+        `${worst.loser.displayName} nunca le ha ganado a ${worst.winner.displayName}`
+      ),
+      detail: tr(
+        `0-${worst.losses}${worst.ties ? `-${worst.ties}` : ""} all-time. Not once.`,
+        `0-${worst.losses}${worst.ties ? `-${worst.ties}` : ""} de por vida. Ni una sola vez.`
+      ),
     });
   }
 
-  // 4. Título Más Dominante — the championship season with the best regular-season record.
+  // 4. Título Más Dominante / Most Dominant Title — the championship season with the best regular-season record.
   const championsBySeasonIndex = await getChampionsBySeasonIndex(chain);
   let bestTitle = null;
   for (let i = 0; i < seasonStandings.length; i += 1) {
@@ -832,9 +866,12 @@ export async function computeNarratives(chain, seasonStandings, h2h, goat, playe
   if (bestTitle) {
     narratives.push({
       icon: "👑",
-      title: "Título Más Dominante",
+      title: tr("Most Dominant Title", "Título Más Dominante"),
       headline: `${bestTitle.line.displayName} — ${bestTitle.season}`,
-      detail: `Campeón con ${bestTitle.line.wins}-${bestTitle.line.losses}${bestTitle.line.ties ? `-${bestTitle.line.ties}` : ""} (${(bestTitle.line.winPct * 100).toFixed(1)}%) en temporada regular. No solo ganó el título, dominó desde el inicio.`,
+      detail: tr(
+        `Champion with a ${bestTitle.line.wins}-${bestTitle.line.losses}${bestTitle.line.ties ? `-${bestTitle.line.ties}` : ""} (${(bestTitle.line.winPct * 100).toFixed(1)}%) regular season. Didn't just win the title — dominated from the start.`,
+        `Campeón con ${bestTitle.line.wins}-${bestTitle.line.losses}${bestTitle.line.ties ? `-${bestTitle.line.ties}` : ""} (${(bestTitle.line.winPct * 100).toFixed(1)}%) en temporada regular. No solo ganó el título, dominó desde el inicio.`
+      ),
     });
   }
 
@@ -842,11 +879,11 @@ export async function computeNarratives(chain, seasonStandings, h2h, goat, playe
   // only run if a players directory was supplied, since callers that don't
   // need them (or don't want the ~5MB fetch) can simply omit it.
   if (playersMap) {
-    narratives.push(...(await computePlayerNarratives(chain, playersMap)));
+    narratives.push(...(await computePlayerNarratives(chain, playersMap, lang)));
     // 7-8. Draft stories (best steal, worst bust) — same playersMap gate.
-    narratives.push(...(await computeDraftNarratives(chain, playersMap)));
+    narratives.push(...(await computeDraftNarratives(chain, playersMap, lang)));
     // 9. Most lopsided trade — same playersMap gate.
-    narratives.push(...(await computeTradeNarratives(chain, playersMap)));
+    narratives.push(...(await computeTradeNarratives(chain, playersMap, lang)));
   }
 
   return narratives;

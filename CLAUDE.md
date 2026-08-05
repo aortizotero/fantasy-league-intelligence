@@ -39,6 +39,7 @@ Convertir el proyecto en un MCP server propio para que un agente pueda consultar
 - Cache en memoria (`Map`) para rosters/usuarios/matchups dentro de `lib/sleeper.js` — evita refetch repetido de la misma liga en un mismo request. Sin TTL/eviction en v1, es intencional (dataset acotado).
 - Las narrativas automáticas (`computeNarratives`) solo se muestran si el dato real las soporta (umbrales mínimos de partidos/temporadas) — nunca forzar una historia sin evidencia suficiente.
 - GOAT ranking: campeonatos primero, récord como desempate — no solo win/loss.
+- `public/*.js` son `<script>` clásicos (sin `type="module"`), a propósito (v1 es sin build step). Efecto secundario: todos comparten el mismo scope léxico global, así que un `let`/`const` de nivel superior con el mismo nombre en dos archivos tira un `SyntaxError` silencioso que mata uno de los dos scripts completo. Ya pasó dos veces (`currentData` en cards.js/myteam.js, `currentLeagueId` en app.js/myteam.js) — revisar nombres contra los demás archivos antes de declarar una variable nueva a nivel superior.
 
 ## Estado actual
 
@@ -81,6 +82,14 @@ Falla con gracia cuando ESPN no tiene el dato: equipos de defensa (ej. "Dallas C
 Bug real encontrado y arreglado en el camino: Sleeper puede regresar una semana "fantasma" después de terminada la temporada (`matchup_id: null` pero `points` con datos reales — parece ser scoring en vivo residual de la NFL sin partido de fantasy asociado). La búsqueda original solo validaba `points > 0` y encontraba esa semana fantasma en vez de la última real. Ahora también exige `matchup_id != null`. Verificado en vivo contra la temporada 2025 ya jugada: encontró correctamente la semana 17 (la final — alexcuate 158.2 vs JorgeGBXI 120.5, coincide con el campeón real de esa temporada).
 
 Con esto la liga ya tiene 9 narrativas automáticas de liga, 2 narrativas personales, 6 tipos de stat card, 2 herramientas de roster, y un resumen semanal — probablemente el punto natural para pausar el "exprimir lo que ya tenemos" y decidir el siguiente salto real.
+
+**i18n shipped (inglés por default, español opcional)** — toggle EN/ES en la esquina superior del header, persistido en `localStorage` (`fli:lang`), sin scope por liga (es una preferencia global, a diferencia de "mi equipo"). Dos capas separadas:
+
+- **UI estática y contenido dinámico del cliente** (`public/i18n.js`): diccionario plano `{en: {...}, es: {...}}` con un helper `t(key, ...args)` — soporta tanto strings simples como funciones para las que llevan datos interpolados (ej. `seasonSummary(season, n)`). Markup estático se traduce vía atributos `data-i18n`/`data-i18n-placeholder`; el HTML generado dinámicamente (`app.js`, `cards.js`, `myteam.js`) llama `t()` directo al construir cada string.
+- **Narrativas del servidor** (`lib/sleeper.js`): las 9 narrativas de liga (`computeNarratives`, `computePlayerNarratives`, `computeDraftNarratives`, `computeTradeNarratives`) ahora reciben un parámetro `lang` y usan un helper local `tr(en, es)` en cada `title`/`headline`/`detail` — no es un dato-separado-de-presentación, sigue siendo texto ya armado, pero bilingüe. `server.js` lee `?lang=` del query string (default `"en"`) y lo pasa hacia abajo; el frontend re-fetchea `/api/league/:id?lang=xx` completo cada vez que cambias de idioma (no solo swapea texto client-side), porque las narrativas viven en el servidor.
+- Los stat lines de ESPN (`lib/espn.js`, ej. "Rushing: 32 CAR, 185 YDS") se quedan en inglés siempre — vienen tal cual de la API de ESPN, que no ofrece labels en español. Es una inconsistencia menor y aceptada, no vale la pena parchearla.
+
+Bug real encontrado y arreglado en el camino (van dos veces con el mismo patrón): `app.js` y `myteam.js` declaraban ambos `let currentLeagueId` a nivel superior — misma colisión de scope léxico global entre `<script>` clásicos que ya nos había pasado con `currentData` en `cards.js`/`myteam.js`. Renombrado a `activeLeagueId` en `app.js`. **Nota para el futuro:** cualquier variable nueva a nivel superior en estos archivos debe revisarse contra las demás antes de nombrarla — no hay aislamiento de módulos aquí.
 
 **Próximo paso:** v3 (capa de AI/Claude) es lo siguiente en el roadmap versionado — sin decidir todavía, preguntar antes de asumir.
 

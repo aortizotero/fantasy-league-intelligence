@@ -1,6 +1,6 @@
 // Shareable stat cards: builds a fixed-size square card for GOAT, H2H,
 // season summaries, and narratives, then exports it via html-to-image
-// (Descargar) or the Web Share API (Compartir — falls back to download on
+// (Download) or the Web Share API (Share — falls back to download on
 // desktop browsers that don't support sharing files).
 
 let currentData = null;
@@ -81,29 +81,29 @@ function cardShell(inner) {
 }
 
 function goatCardHtml(g, leagueName) {
-  const rings = g.championships > 0 ? "🏆".repeat(g.championships) : "Sin anillos todavía";
+  const rings = g.championships > 0 ? "🏆".repeat(g.championships) : t("noRingsYet");
   return cardShell(`
-    <div class="stat-card-eyebrow">🐐 GOAT de ${escapeHtml(leagueName)}</div>
+    <div class="stat-card-eyebrow">${escapeHtml(t("cardGoatEyebrow", leagueName))}</div>
     <div class="stat-card-emoji">🐐</div>
     <div class="stat-card-name">${escapeHtml(g.displayName)}</div>
     <div class="stat-card-rings">${rings}</div>
     <div class="stat-card-stat-row">
-      <div class="stat-card-stat"><span class="stat-card-num">${g.wins}-${g.losses}${g.ties ? `-${g.ties}` : ""}</span><span class="stat-card-label">Récord</span></div>
-      <div class="stat-card-stat"><span class="stat-card-num">${(g.winPct * 100).toFixed(1)}%</span><span class="stat-card-label">Win%</span></div>
-      <div class="stat-card-stat"><span class="stat-card-num">${g.seasons}</span><span class="stat-card-label">Temporadas</span></div>
+      <div class="stat-card-stat"><span class="stat-card-num">${g.wins}-${g.losses}${g.ties ? `-${g.ties}` : ""}</span><span class="stat-card-label">${t("cardRecord")}</span></div>
+      <div class="stat-card-stat"><span class="stat-card-num">${(g.winPct * 100).toFixed(1)}%</span><span class="stat-card-label">${t("cardWinPct")}</span></div>
+      <div class="stat-card-stat"><span class="stat-card-num">${g.seasons}</span><span class="stat-card-label">${t("cardSeasons")}</span></div>
     </div>
   `);
 }
 
 function championCardHtml(c, season, leagueName) {
   return cardShell(`
-    <div class="stat-card-eyebrow">🏆 Campeón ${escapeHtml(season)} — ${escapeHtml(leagueName)}</div>
+    <div class="stat-card-eyebrow">${escapeHtml(t("cardChampionEyebrow", season, leagueName))}</div>
     <div class="stat-card-emoji">🏆</div>
     <div class="stat-card-name">${escapeHtml(c.displayName)}</div>
     <div class="stat-card-stat-row">
-      <div class="stat-card-stat"><span class="stat-card-num">${c.wins}-${c.losses}${c.ties ? `-${c.ties}` : ""}</span><span class="stat-card-label">Récord</span></div>
-      <div class="stat-card-stat"><span class="stat-card-num">${(c.winPct * 100).toFixed(1)}%</span><span class="stat-card-label">Win%</span></div>
-      <div class="stat-card-stat"><span class="stat-card-num">${c.pointsFor.toFixed(0)}</span><span class="stat-card-label">Puntos</span></div>
+      <div class="stat-card-stat"><span class="stat-card-num">${c.wins}-${c.losses}${c.ties ? `-${c.ties}` : ""}</span><span class="stat-card-label">${t("cardRecord")}</span></div>
+      <div class="stat-card-stat"><span class="stat-card-num">${(c.winPct * 100).toFixed(1)}%</span><span class="stat-card-label">${t("cardWinPct")}</span></div>
+      <div class="stat-card-stat"><span class="stat-card-num">${c.pointsFor.toFixed(0)}</span><span class="stat-card-label">${t("cardPoints")}</span></div>
     </div>
   `);
 }
@@ -111,30 +111,30 @@ function championCardHtml(c, season, leagueName) {
 function weekCardHtml(wr, leagueName) {
   const line = (r) => `${escapeHtml(r.teamA.displayName)} ${r.teamA.points.toFixed(1)} - ${r.teamB.points.toFixed(1)} ${escapeHtml(r.teamB.displayName)}`;
   return cardShell(`
-    <div class="stat-card-eyebrow">📅 Semana ${wr.week} — ${escapeHtml(leagueName)}</div>
+    <div class="stat-card-eyebrow">${escapeHtml(t("cardWeekEyebrow", wr.week, leagueName))}</div>
     <div class="stat-card-week-block">
-      <div class="stat-card-narrative-title">💥 Golpe de la Semana</div>
+      <div class="stat-card-narrative-title">${t("cardBlowoutTitle")}</div>
       <div class="stat-card-week-score">${line(wr.blowout)}</div>
-      <div class="stat-card-caption">${wr.blowout.margin.toFixed(1)} pts de diferencia</div>
+      <div class="stat-card-caption">${wr.blowout.margin.toFixed(1)} ${t("marginSuffix")}</div>
     </div>
     <div class="stat-card-week-block">
-      <div class="stat-card-narrative-title">😰 Partido Más Cerrado</div>
+      <div class="stat-card-narrative-title">${t("cardClosestTitle")}</div>
       <div class="stat-card-week-score">${line(wr.tightest)}</div>
-      <div class="stat-card-caption">${wr.tightest.margin.toFixed(1)} pts de diferencia</div>
+      <div class="stat-card-caption">${wr.tightest.margin.toFixed(1)} ${t("marginSuffix")}</div>
     </div>
   `);
 }
 
 function h2hCardHtml(aName, bName, record, leagueName) {
   return cardShell(`
-    <div class="stat-card-eyebrow">⚔️ Head to Head — ${escapeHtml(leagueName)}</div>
+    <div class="stat-card-eyebrow">${escapeHtml(t("cardH2HEyebrow", leagueName))}</div>
     <div class="stat-card-vs">
       <div class="stat-card-vs-name">${escapeHtml(aName)}</div>
       <div class="stat-card-vs-versus">VS</div>
       <div class="stat-card-vs-name">${escapeHtml(bName)}</div>
     </div>
     <div class="stat-card-record">${escapeHtml(record)}</div>
-    <div class="stat-card-caption">Récord histórico, de por vida</div>
+    <div class="stat-card-caption">${t("cardAllTimeRecord")}</div>
   `);
 }
 
@@ -152,7 +152,7 @@ function seasonCardHtml(seasonEntry, leagueName) {
   return cardShell(`
     <div class="stat-card-eyebrow">📅 ${escapeHtml(leagueName)}</div>
     <div class="stat-card-season">${escapeHtml(seasonEntry.season)}</div>
-    <div class="stat-card-caption">Standings finales</div>
+    <div class="stat-card-caption">${t("cardFinalStandings")}</div>
     <div class="stat-card-ranklist">${rows}</div>
   `);
 }
@@ -176,7 +176,7 @@ function escapeHtml(str) {
 downloadBtn.addEventListener("click", async () => {
   const node = canvas.querySelector(".stat-card");
   if (!node) return;
-  hintEl.textContent = "Generando imagen...";
+  hintEl.textContent = t("generatingImage");
   try {
     const dataUrl = await htmlToImage.toPng(node, { pixelRatio: 3 });
     const a = document.createElement("a");
@@ -185,14 +185,14 @@ downloadBtn.addEventListener("click", async () => {
     a.click();
     hintEl.textContent = "";
   } catch (err) {
-    hintEl.textContent = "⚠️ No se pudo generar la imagen.";
+    hintEl.textContent = t("imageError");
   }
 });
 
 shareBtn.addEventListener("click", async () => {
   const node = canvas.querySelector(".stat-card");
   if (!node) return;
-  hintEl.textContent = "Generando imagen...";
+  hintEl.textContent = t("generatingImage");
   try {
     const blob = await htmlToImage.toBlob(node, { pixelRatio: 3 });
     const file = new File([blob], "fantasy-league-card.png", { type: "image/png" });
@@ -207,9 +207,9 @@ shareBtn.addEventListener("click", async () => {
       a.download = "fantasy-league-card.png";
       a.click();
       URL.revokeObjectURL(url);
-      hintEl.textContent = "Tu navegador no soporta compartir directo — descargamos la imagen, compártela manualmente.";
+      hintEl.textContent = t("shareUnsupported");
     }
   } catch (err) {
-    if (err.name !== "AbortError") hintEl.textContent = "⚠️ No se pudo compartir la imagen.";
+    if (err.name !== "AbortError") hintEl.textContent = t("shareError");
   }
 });
