@@ -74,7 +74,9 @@ Falla con gracia cuando ESPN no tiene el dato: equipos de defensa (ej. "Dallas C
 - **Capital de Draft** (`computeDraftPickCapital`): usa `/v1/league/{id}/traded_picks` para calcular picks netos ganados/perdidos por trade (no reconstruye el inventario completo del draft, solo el diff vs. lo que cada quien tendría "de forma natural" — un pick nunca tradeado simplemente no aparece en la lista). Verificado que la suma neta de toda la liga da exactamente 0 (zero-sum, como debe ser en un intercambio de picks).
 - Ambas reusan el `data-owner-id` del selector "Mi equipo", así que también se resaltan solas si seleccionas tu equipo.
 
-Con esto la liga ya tiene 9 narrativas automáticas, 5 tipos de stat card, y 2 herramientas de roster — probablemente el punto natural para pausar el "exprimir lo que ya tenemos" y decidir el siguiente salto real.
+**Rivalidades personalizadas shipped** — "Tu Némesis" (a quién le tienes peor récord) y "Tu Víctima" (a quién más dominas), calculadas 100% client-side en `myteam.js` a partir del `h2h` que ya está cargado, en cuanto seleccionas tu equipo en "Mi equipo". No son narrativas del servidor (dependen de quién esté viendo, no son un hecho fijo de la liga), así que viven aparte de `data.narratives` — pero se comparten igual: `cards.js` ganó un tipo `"personal"` que arma la card directo desde los atributos `data-*` del botón en vez de buscar por índice en un arreglo. Verificado en vivo: alexortizotero tiene 1-6-1 contra carlos1rvp (némesis) y 7-2-1 contra Fedesalazar10 (víctima) — coincide exacto con la matriz H2H.
+
+Con esto la liga ya tiene 9 narrativas automáticas de liga, 2 narrativas personales, 5 tipos de stat card, y 2 herramientas de roster — probablemente el punto natural para pausar el "exprimir lo que ya tenemos" y decidir el siguiente salto real.
 
 **Próximo paso:** v3 (capa de AI/Claude) es lo siguiente en el roadmap versionado — sin decidir todavía, preguntar antes de asumir.
 

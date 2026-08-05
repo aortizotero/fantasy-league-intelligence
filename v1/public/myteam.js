@@ -41,6 +41,87 @@ function applyHighlight() {
   document.querySelectorAll(".narrative-card").forEach((card) => {
     card.classList.toggle("mentions-me", !!myName && card.textContent.includes(myName));
   });
+
+  renderRivalries(ownerId);
+}
+
+const MIN_RIVALRY_GAMES = 3; // enough head-to-head games for "nemesis"/"victim" to mean something
+
+// Your worst and best personal matchup, from the h2h data already loaded —
+// purely a reshuffle of what's on the page, from the selected manager's
+// point of view instead of the league's.
+function computeRivalries(ownerId) {
+  if (!ownerId || !myTeamData) return null;
+  let nemesis = null; // { rival, myWins, theirWins, ties, winPct }
+  let victim = null;
+
+  for (const r of myTeamData.h2h) {
+    let rival, myWins, theirWins, ties;
+    if (r.managerA.ownerId === ownerId) {
+      rival = r.managerB; myWins = r.aWins; theirWins = r.bWins; ties = r.ties;
+    } else if (r.managerB.ownerId === ownerId) {
+      rival = r.managerA; myWins = r.bWins; theirWins = r.aWins; ties = r.ties;
+    } else continue;
+
+    const games = myWins + theirWins + ties;
+    if (games < MIN_RIVALRY_GAMES) continue;
+    const winPct = myWins / games;
+    const entry = { rival, myWins, theirWins, ties, winPct };
+
+    if (!nemesis || winPct < nemesis.winPct) nemesis = entry;
+    if (!victim || winPct > victim.winPct) victim = entry;
+  }
+
+  return { nemesis, victim };
+}
+
+function renderRivalries(ownerId) {
+  const section = document.getElementById("rivalry-section");
+  const container = document.getElementById("rivalry-cards");
+  const result = computeRivalries(ownerId);
+  const cards = [];
+
+  if (result?.nemesis) {
+    const n = result.nemesis;
+    cards.push(
+      rivalryCardHtml(
+        "🧟",
+        "Tu Némesis",
+        n.rival.displayName,
+        `${n.myWins}-${n.theirWins}${n.ties ? `-${n.ties}` : ""} de por vida contra ${n.rival.displayName}. Tu peor matchup histórico.`
+      )
+    );
+  }
+  if (result?.victim) {
+    const v = result.victim;
+    cards.push(
+      rivalryCardHtml(
+        "😈",
+        "Tu Víctima",
+        v.rival.displayName,
+        `${v.myWins}-${v.theirWins}${v.ties ? `-${v.ties}` : ""} de por vida contra ${v.rival.displayName}. Al que siempre le ganas.`
+      )
+    );
+  }
+
+  if (!cards.length) {
+    section.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+  section.hidden = false;
+  container.innerHTML = `<div class="narrative-grid">${cards.join("")}</div>`;
+}
+
+function rivalryCardHtml(icon, title, headline, detail) {
+  return `
+    <div class="narrative-card">
+      <div class="narrative-icon">${icon}</div>
+      <div class="narrative-title">${escapeHtml(title)}</div>
+      <div class="narrative-headline">${escapeHtml(headline)}</div>
+      <div class="narrative-detail">${escapeHtml(detail)}</div>
+      <button class="card-trigger-btn" data-card="personal" data-icon="${escapeHtml(icon)}" data-title="${escapeHtml(title)}" data-headline="${escapeHtml(headline)}" data-detail="${escapeHtml(detail)}" type="button">📤 Compartir</button>
+    </div>`;
 }
 
 function escapeHtml(str) {

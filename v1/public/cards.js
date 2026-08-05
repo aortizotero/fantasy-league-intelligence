@@ -64,6 +64,11 @@ function buildCardHtml(ds) {
       const n = currentData.narratives[Number(ds.index)];
       return n ? narrativeCardHtml(n, leagueName) : null;
     }
+    case "personal":
+      // "Mi equipo" rivalry cards (Némesis/Víctima) — computed client-side
+      // by myteam.js, so the data rides along on the trigger button itself
+      // instead of an index into currentData.
+      return narrativeCardHtml({ icon: ds.icon, title: ds.title, headline: ds.headline, detail: ds.detail }, leagueName);
     default:
       return null;
   }
