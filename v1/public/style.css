@@ -50,6 +50,10 @@ button {
 }
 button:hover { opacity: 0.9; }
 
+.form-help { text-align: center; margin-top: 0; }
+.form-help a { color: var(--accent); text-decoration: none; }
+.form-help a:hover { text-decoration: underline; }
+
 #status { text-align: center; color: var(--muted); min-height: 20px; }
 
 section {
