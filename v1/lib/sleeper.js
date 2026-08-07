@@ -106,7 +106,7 @@ function buildRosterMap(league) {
         const user = usersById.get(roster.owner_id);
         rosterMap.set(roster.roster_id, {
           ownerId: roster.owner_id || `orphan-${roster.roster_id}`,
-          displayName: user?.display_name || user?.metadata?.team_name || `Roster ${roster.roster_id}`,
+          displayName: user?.metadata?.team_name || user?.display_name || `Roster ${roster.roster_id}`,
           roster,
         });
       }
