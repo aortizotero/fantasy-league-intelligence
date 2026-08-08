@@ -2,6 +2,7 @@
 // Docs: https://docs.sleeper.com/
 
 import { getStatLine } from "./espn.js";
+import { getValuesBySleeperId } from "./fantasycalc.js";
 
 const BASE = "https://api.sleeper.app/v1";
 const MAX_SEASONS = 25; // safety cap when walking previous_league_id chains
@@ -368,6 +369,50 @@ export async function computeRosterDepth(currentLeague, playersMap) {
     }
     const total = Object.values(counts).reduce((a, b) => a + b, 0) + other;
     return { ownerId, displayName, counts, other, total };
+  });
+}
+
+const VALUE_POSITIONS = ["QB", "RB", "WR", "TE"]; // FantasyCalc doesn't price K/DEF
+
+// Superflex leagues value QBs roughly 2x a 1QB league, and PPR scoring
+// shifts RB/WR value — both change the FantasyCalc numbers materially, so
+// they're derived from the league's actual settings rather than hardcoded.
+function deriveNumQbs(rosterPositions = []) {
+  const qbSlots = rosterPositions.filter((p) => p === "QB").length || 1;
+  return rosterPositions.includes("SUPER_FLEX") ? qbSlots + 1 : qbSlots;
+}
+
+// Current dynasty trade value of each manager's roster, broken down by
+// position — "who's actually stacked at a position" in trade-value terms,
+// not just player count (that's computeRosterDepth). Values come from
+// FantasyCalc (see lib/fantasycalc.js), matched to the roster via each
+// player's sleeperId. Returns null if FantasyCalc is unreachable — the
+// section just doesn't render rather than failing the whole league load,
+// same as how a missing ESPN stat line degrades gracefully.
+export async function computeRosterValue(currentLeague, playersMap) {
+  const rosterMap = await buildRosterMap(currentLeague);
+  const numQbs = deriveNumQbs(currentLeague.roster_positions);
+  const numTeams = currentLeague.total_rosters || rosterMap.size;
+  const ppr = currentLeague.scoring_settings?.rec ?? 0;
+
+  let valuesBySleeperId;
+  try {
+    valuesBySleeperId = await getValuesBySleeperId({ numQbs, numTeams, ppr });
+  } catch {
+    return null;
+  }
+
+  return [...rosterMap.values()].map(({ ownerId, displayName, roster }) => {
+    const byPosition = Object.fromEntries(VALUE_POSITIONS.map((p) => [p, 0]));
+    let total = 0;
+    for (const playerId of roster.players || []) {
+      const position = playersMap.get(playerId)?.position;
+      if (!position || byPosition[position] == null) continue;
+      const value = valuesBySleeperId.get(playerId) || 0;
+      byPosition[position] += value;
+      total += value;
+    }
+    return { ownerId, displayName, byPosition, total };
   });
 }
 

@@ -19,6 +19,7 @@ import {
   computeTrophyCase,
   computePlayoffBracket,
   computeTradeTracker,
+  computeRosterValue,
 } from "./lib/sleeper.js";
 import { analyzeTrade } from "./lib/claude.js";
 
@@ -77,7 +78,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
     // the user actually entered), not the whole historical chain. Season
     // Trend / Luck Index / Power Rankings are also current-season only,
     // for the same reason.
-    const [rosterDepth, draftPicks, weekRecap, seasonTrend, luckIndex, powerRankings, trophyCase, playoffBracket, tradeTracker] =
+    const [rosterDepth, draftPicks, weekRecap, seasonTrend, luckIndex, powerRankings, trophyCase, playoffBracket, tradeTracker, rosterValue] =
       await Promise.all([
         computeRosterDepth(league, playersMap),
         computeDraftPickCapital(league),
@@ -88,6 +89,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
         computeTrophyCase(chain, historicalStandings),
         computePlayoffBracket(league),
         computeTradeTracker(chain, playersMap),
+        computeRosterValue(league, playersMap),
       ]);
 
     res.json({
@@ -107,6 +109,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       trophyCase,
       playoffBracket,
       tradeTracker,
+      rosterValue,
     });
   } catch (err) {
     console.error(err);

@@ -130,6 +130,7 @@ function render(data) {
 
   document.getElementById("roster-depth").innerHTML = scrollWrap(rosterDepthTable(data.rosterDepth));
   document.getElementById("draft-picks").innerHTML = scrollWrap(draftPicksTable(data.draftPicks));
+  toggleSection("roster-value-section", "roster-value", data.rosterValue, rosterValueTable, true);
 
   toggleSection("trophy-case-section", "trophy-case", data.trophyCase, trophyCaseHtml);
   toggleSection("bracket-section", "playoff-bracket", data.playoffBracket, playoffBracketHtml);
@@ -221,6 +222,7 @@ function weekRecapHtml(wr) {
 }
 
 const POSITION_COLUMNS = ["QB", "RB", "WR", "TE", "K", "DEF"];
+const VALUE_POSITION_COLUMNS = ["QB", "RB", "WR", "TE"]; // FantasyCalc doesn't price K/DEF
 
 // One row per manager, one column per position — bolds the single highest
 // count in each column so "who's stacked at RB" is a glance, not a scan.
@@ -243,6 +245,32 @@ function rosterDepthTable(rosterDepth) {
     .join("");
 
   const header = `<th></th>${POSITION_COLUMNS.map((p) => `<th>${p}</th>`).join("")}<th>${t("colTotal")}</th>`;
+  return `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// Sorted by total value descending — unlike Roster Depth (count, no natural
+// ranking), value is exactly what the user wants to compare across managers.
+function rosterValueTable(rosterValue) {
+  if (!rosterValue || !rosterValue.length) return `<p class='hint'>${t("noData")}</p>`;
+
+  const maxByPosition = Object.fromEntries(
+    VALUE_POSITION_COLUMNS.map((pos) => [pos, Math.max(...rosterValue.map((r) => r.byPosition[pos] || 0))])
+  );
+
+  const rows = rosterValue
+    .slice()
+    .sort((a, b) => b.total - a.total)
+    .map((r) => {
+      const cells = VALUE_POSITION_COLUMNS.map((pos) => {
+        const value = r.byPosition[pos] || 0;
+        const isMax = value > 0 && value === maxByPosition[pos];
+        return `<td class="${isMax ? "depth-max" : ""}">${value.toLocaleString()}</td>`;
+      }).join("");
+      return `<tr data-owner-id="${escapeHtml(r.ownerId)}"><td class="row-label">${escapeHtml(r.displayName)}</td>${cells}<td>${r.total.toLocaleString()}</td></tr>`;
+    })
+    .join("");
+
+  const header = `<th></th>${VALUE_POSITION_COLUMNS.map((p) => `<th>${p}</th>`).join("")}<th>${t("colTotal")}</th>`;
   return `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 

@@ -76,6 +76,8 @@ const STRINGS = {
 
     rosterDepthTitle: "📦 Roster Depth",
     rosterDepthHint: "How many players each team has at each position right now — useful for knowing who to offer a trade if you need help.",
+    rosterValueTitle: "💰 Roster Value",
+    rosterValueHint: "Current dynasty trade value per position, from FantasyCalc — who's actually stacked in trade-value terms, not just player count.",
     colTotal: "Total",
 
     draftPicksTitle: "🎟️ Draft Capital",
@@ -215,6 +217,8 @@ const STRINGS = {
 
     rosterDepthTitle: "📦 Profundidad de Roster",
     rosterDepthHint: "Cuántos jugadores tiene cada equipo por posición ahorita — útil para saber a quién ofrecerle un trade si te falta algo.",
+    rosterValueTitle: "💰 Valor de Roster",
+    rosterValueHint: "Valor actual de trade por posición según FantasyCalc — quién está realmente stacked en términos de valor, no solo de cantidad de jugadores.",
     colTotal: "Total",
 
     draftPicksTitle: "🎟️ Capital de Draft",
