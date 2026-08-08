@@ -3,6 +3,7 @@
 
 import { getStatLine } from "./espn.js";
 import { getValuesBySleeperId } from "./fantasycalc.js";
+import { getProjectionsCached, projectionScoringField } from "./projections.js";
 
 const BASE = "https://api.sleeper.app/v1";
 const MAX_SEASONS = 25; // safety cap when walking previous_league_id chains
@@ -758,6 +759,84 @@ export async function computeWeekRecap(currentLeague, playersMap) {
   }
 
   return { season: currentLeague.season, week: found.week, results, blowout, tightest, benchBlunder };
+}
+
+const REPORT_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"];
+
+// Actual vs. projected points for the last played week, by position, in
+// three scopes: starters only, starters + full bench, and starters + just
+// the single best-projected bench player at each position ("primary
+// backup") — a middle ground between the other two, not full bench depth.
+// Reuses findLastPlayedWeek's matchups (same week Week Recap uses) instead
+// of a second week-search pass.
+export async function computePositionPointsReport(currentLeague, playersMap) {
+  const found = await findLastPlayedWeek(currentLeague);
+  if (!found) return null;
+
+  let projections;
+  try {
+    projections = await getProjectionsCached(currentLeague.season, found.week);
+  } catch {
+    projections = new Map(); // degrade to projected: 0 rather than failing the whole section
+  }
+  const field = projectionScoringField(currentLeague.scoring_settings);
+  const projectedPoints = (playerId) => projections.get(playerId)?.[field] || 0;
+
+  const rosterMap = await buildRosterMap(currentLeague);
+  const emptyScope = () => Object.fromEntries(REPORT_POSITIONS.map((p) => [p, { actual: 0, projected: 0 }]));
+
+  const teams = [];
+  for (const m of found.matchups) {
+    const roster = rosterMap.get(m.roster_id);
+    if (!roster) continue;
+
+    const starters = new Set((m.starters || []).filter((id) => id && id !== "0"));
+    const actualPoints = m.players_points || {};
+    const starterScope = emptyScope();
+    const benchScope = emptyScope();
+    const backupScope = emptyScope();
+    // Best-projected bench player per position — the "primary backup" added
+    // to backupScope once, not the whole bench (that's benchScope's job).
+    const bestBackup = Object.fromEntries(REPORT_POSITIONS.map((p) => [p, null]));
+
+    for (const playerId of m.players || []) {
+      const position = playersMap.get(playerId)?.position;
+      if (!position || !starterScope[position]) continue;
+      const actual = actualPoints[playerId] || 0;
+      const projected = projectedPoints(playerId);
+
+      benchScope[position].actual += actual;
+      benchScope[position].projected += projected;
+
+      if (starters.has(playerId)) {
+        starterScope[position].actual += actual;
+        starterScope[position].projected += projected;
+        backupScope[position].actual += actual;
+        backupScope[position].projected += projected;
+      } else {
+        const current = bestBackup[position];
+        if (!current || projected > current.projected) bestBackup[position] = { actual, projected };
+      }
+    }
+
+    for (const position of REPORT_POSITIONS) {
+      const backup = bestBackup[position];
+      if (backup) {
+        backupScope[position].actual += backup.actual;
+        backupScope[position].projected += backup.projected;
+      }
+    }
+
+    teams.push({
+      ownerId: roster.ownerId,
+      displayName: roster.displayName,
+      starters: starterScope,
+      startersAndBench: benchScope,
+      startersAndBackup: backupScope,
+    });
+  }
+
+  return { week: found.week, season: currentLeague.season, teams };
 }
 
 // ---- Player-level narratives (v2) --------------------------------------

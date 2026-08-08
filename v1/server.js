@@ -20,6 +20,7 @@ import {
   computePlayoffBracket,
   computeTradeTracker,
   computeRosterValue,
+  computePositionPointsReport,
 } from "./lib/sleeper.js";
 import { analyzeTrade } from "./lib/claude.js";
 
@@ -78,19 +79,31 @@ app.get("/api/league/:leagueId", async (req, res) => {
     // the user actually entered), not the whole historical chain. Season
     // Trend / Luck Index / Power Rankings are also current-season only,
     // for the same reason.
-    const [rosterDepth, draftPicks, weekRecap, seasonTrend, luckIndex, powerRankings, trophyCase, playoffBracket, tradeTracker, rosterValue] =
-      await Promise.all([
-        computeRosterDepth(league, playersMap),
-        computeDraftPickCapital(league),
-        computeWeekRecap(league, playersMap),
-        computeSeasonTrend(league),
-        computeLuckIndex(league),
-        computePowerRankings(league),
-        computeTrophyCase(chain, historicalStandings),
-        computePlayoffBracket(league),
-        computeTradeTracker(chain, playersMap),
-        computeRosterValue(league, playersMap),
-      ]);
+    const [
+      rosterDepth,
+      draftPicks,
+      weekRecap,
+      seasonTrend,
+      luckIndex,
+      powerRankings,
+      trophyCase,
+      playoffBracket,
+      tradeTracker,
+      rosterValue,
+      positionPointsReport,
+    ] = await Promise.all([
+      computeRosterDepth(league, playersMap),
+      computeDraftPickCapital(league),
+      computeWeekRecap(league, playersMap),
+      computeSeasonTrend(league),
+      computeLuckIndex(league),
+      computePowerRankings(league),
+      computeTrophyCase(chain, historicalStandings),
+      computePlayoffBracket(league),
+      computeTradeTracker(chain, playersMap),
+      computeRosterValue(league, playersMap),
+      computePositionPointsReport(league, playersMap),
+    ]);
 
     res.json({
       league: { name: league.name, season: league.season, totalSeasons: chain.length },
@@ -110,6 +123,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       playoffBracket,
       tradeTracker,
       rosterValue,
+      positionPointsReport,
     });
   } catch (err) {
     console.error(err);

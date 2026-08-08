@@ -7,6 +7,8 @@ const leagueIdError = document.getElementById("league-id-error");
 let activeLeagueId = null;
 let allTrades = []; // full tradeTracker list from the last load — renderTradeTracker() filters/slices from this, no re-fetch needed
 const TRADE_TRACKER_LIMIT = 5;
+let currentPointsReport = null; // full positionPointsReport payload — scope toggle re-renders from this, no re-fetch needed
+let pointsReportScope = "starters"; // persists across scope changes within a session (not saved — resets on reload, unlike Mi equipo)
 
 // Sleeper League IDs are numeric snowflake-style IDs (18-19 digits in
 // practice). This isn't a hard spec, just enough to catch "pasted the wrong
@@ -131,6 +133,8 @@ function render(data) {
   document.getElementById("roster-depth").innerHTML = scrollWrap(rosterDepthTable(data.rosterDepth));
   document.getElementById("draft-picks").innerHTML = scrollWrap(draftPicksTable(data.draftPicks));
   toggleSection("roster-value-section", "roster-value", data.rosterValue, rosterValueTable, true);
+  currentPointsReport = data.positionPointsReport;
+  renderPointsReport();
 
   toggleSection("trophy-case-section", "trophy-case", data.trophyCase, trophyCaseHtml);
   toggleSection("bracket-section", "playoff-bracket", data.playoffBracket, playoffBracketHtml);
@@ -273,6 +277,65 @@ function rosterValueTable(rosterValue) {
   const header = `<th></th>${VALUE_POSITION_COLUMNS.map((p) => `<th>${p}</th>`).join("")}<th>${t("colTotal")}</th>`;
   return `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
 }
+
+function renderPointsReport() {
+  toggleSection("points-report-section", "points-report", currentPointsReport, pointsReportHtml, true);
+}
+
+function pointsReportHtml(report) {
+  const controls = `
+    <div class="points-report-controls">
+      <label for="points-report-scope">${t("pointsReportScopeLabel")}</label>
+      <select id="points-report-scope">
+        <option value="starters" ${pointsReportScope === "starters" ? "selected" : ""}>${t("pointsReportScopeStarters")}</option>
+        <option value="startersAndBench" ${pointsReportScope === "startersAndBench" ? "selected" : ""}>${t("pointsReportScopeBench")}</option>
+        <option value="startersAndBackup" ${pointsReportScope === "startersAndBackup" ? "selected" : ""}>${t("pointsReportScopeBackup")}</option>
+      </select>
+    </div>`;
+  const weekHint = `<p class="hint">${t("pointsReportWeek", report.season, report.week)}</p>`;
+  return controls + weekHint + pointsReportTable(report.teams, pointsReportScope);
+}
+
+const DELTA_DEADZONE = 0.5; // ignore noise this small rather than color-coding every fractional difference
+
+function pointsReportCell(actual, projected) {
+  const delta = actual - projected;
+  const deltaClass = delta > DELTA_DEADZONE ? "power-up" : delta < -DELTA_DEADZONE ? "power-down" : "";
+  return `<td><div class="pp-cell"><span class="pp-actual ${deltaClass}">${actual.toFixed(1)}</span><span class="pp-projected">${t("pointsReportProjected", projected.toFixed(1))}</span></div></td>`;
+}
+
+// Sorted by delta (actual minus projected) descending — the point of this
+// table is "who beat their projection", so that's the natural ranking,
+// unlike Roster Depth/Value where total makes more sense.
+function pointsReportTable(teams, scope) {
+  if (!teams || !teams.length) return `<p class='hint'>${t("noData")}</p>`;
+
+  const withTotals = teams.map((team) => {
+    const byPosition = team[scope];
+    const total = POSITION_COLUMNS.reduce(
+      (acc, pos) => ({ actual: acc.actual + byPosition[pos].actual, projected: acc.projected + byPosition[pos].projected }),
+      { actual: 0, projected: 0 }
+    );
+    return { ownerId: team.ownerId, displayName: team.displayName, byPosition, total };
+  });
+
+  const rows = withTotals
+    .sort((a, b) => (b.total.actual - b.total.projected) - (a.total.actual - a.total.projected))
+    .map((team) => {
+      const cells = POSITION_COLUMNS.map((pos) => pointsReportCell(team.byPosition[pos].actual, team.byPosition[pos].projected)).join("");
+      return `<tr data-owner-id="${escapeHtml(team.ownerId)}"><td class="row-label">${escapeHtml(team.displayName)}</td>${cells}${pointsReportCell(team.total.actual, team.total.projected)}</tr>`;
+    })
+    .join("");
+
+  const header = `<th></th>${POSITION_COLUMNS.map((p) => `<th>${p}</th>`).join("")}<th>${t("colTotal")}</th>`;
+  return `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+document.addEventListener("change", (e) => {
+  if (e.target.id !== "points-report-scope") return;
+  pointsReportScope = e.target.value;
+  renderPointsReport();
+});
 
 function draftPicksTable(draftPicks) {
   if (!draftPicks || !draftPicks.length) return `<p class='hint'>${t("noData")}</p>`;

@@ -127,7 +127,20 @@ Bug real encontrado y arreglado en el camino (van dos veces con el mismo patrón
 - **Degrada con gracia**: si FantasyCalc no responde, `computeRosterValue` regresa `null` y la sección simplemente no se muestra (mismo patrón que ESPN en v2), no rompe el resto de la carga de la liga.
 - Reusa `data-owner-id` de "Mi equipo" para resaltarse solo. Verificado en vivo: máximos por columna y orden por valor total coinciden con los datos crudos de la API.
 
-**Próximo paso:** reporte de puntos proyectados vs. reales por posición (con splits titulares / titulares+banca / titular+backup principal) — 100% Sleeper, ya se confirmó que existe `api.sleeper.com/projections/nfl/{season}/{week}` con el mismo shape que los puntos reales que ya usa el proyecto. Sin empezar todavía.
+**Reporte de Puntos shipped (`lib/projections.js`)** — nueva sección "📈 Points Report": puntos reales vs. proyectados por posición para la última semana jugada, con un selector de alcance (sin re-fetch, reshuffle 100% client-side sobre el mismo payload, mismo patrón que el filtro de Trade Tracker):
+
+- **Titulares** — solo los jugadores en `starters` esa semana.
+- **Titulares + Banca** — todo el roster (`players`), titular o no.
+- **Titular + Backup Principal** — titulares, más *un solo* jugador de banca por posición: el de mayor proyección esa semana (no toda la banca — ese es el punto medio entre las otras dos vistas, y es literalmente lo que Alex pidió: "el titular y su primera banca").
+
+Fuente de proyecciones: `api.sleeper.com/projections/nfl/{season}/{week}` — reusa `findLastPlayedWeek` (la misma semana que ya usa Resumen de la Semana, sin una segunda búsqueda). Los puntos reales vienen de `players_points`/`starters`, exactamente igual que el resto del proyecto. Cachea por `season:week` sin TTL (a diferencia de FantasyCalc, una semana ya jugada no cambia — mismo criterio que matchups/transactions).
+
+- **Caveat documentado:** Sleeper solo expone 3 buckets de scoring en sus proyecciones (`pts_std`/`pts_half_ppr`/`pts_ppr`), no el scoring exacto y custom de la liga — se elige el bucket más cercano según `scoring_settings.rec` de la liga. Es una aproximación, mismo tipo de limitación ya aceptada con los stat lines de ESPN.
+- **Orden por delta** (real menos proyectado), no por total — el punto de esta tabla es "quién superó su proyección", a diferencia de Roster Depth/Value donde el total sí es lo relevante.
+- Colores reusan `.power-up`/`.power-down` de Power Rankings (verde accent / rojo desaturado) con una zona muerta de ±0.5 pts para no marcar ruido como señal.
+- Verificado en vivo contra la semana 17 de 2025 (la final): el total real de alexcuate coincide exacto (158.2 pts) con el valor ya verificado anteriormente para esa misma semana en Resumen de la Semana — confirma que el cálculo de puntos reales es consistente entre features. Los tres alcances se comportan como se espera (titulares ≤ backup ≤ banca en cada posición). Se oculta con gracia si la temporada actual no ha arrancado (mismo criterio que Resumen de la Semana).
+
+Con esto, v3 tiene tres piezas nuevas fuera del roadmap original de "solo Claude" (análisis de trades con IA, valor de roster vía FantasyCalc, reporte de puntos vía proyecciones de Sleeper) — todas nacieron de la misma sesión de trabajo, a partir de pedidos directos de Alex sobre qué le serviría de verdad para tomar decisiones de manager, no del roadmap versionado original.
 
 ## Notas
 
