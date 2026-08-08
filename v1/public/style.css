@@ -132,6 +132,23 @@ section {
 section h2 { margin-top: 0; }
 .hint { color: var(--muted); font-size: 13px; margin-top: -8px; }
 
+#about-section { max-width: 560px; margin-left: auto; margin-right: auto; }
+#about-section p { color: var(--muted); font-size: 14px; line-height: 1.5; }
+#about-section ul { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
+#about-section li {
+  font-size: 13px;
+  line-height: 1.5;
+  padding-left: 20px;
+  position: relative;
+}
+#about-section li::before {
+  content: "✓";
+  color: var(--accent);
+  position: absolute;
+  left: 0;
+  font-weight: 700;
+}
+
 table { width: 100%; border-collapse: collapse; margin-top: 8px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 14px; }
 th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; }

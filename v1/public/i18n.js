@@ -15,6 +15,15 @@ const STRINGS = {
     invalidLeagueId: "That doesn't look like a Sleeper League ID.",
     coachmarkText: "Tap any row to turn it into a shareable card",
     coachmarkDismiss: "Dismiss",
+
+    aboutTitle: "What Story of My League tracks",
+    aboutIntro: "Paste your Sleeper League ID above and get a full history of your fantasy football league — no setup, no account, nothing to connect. It's free and works with any Sleeper league.",
+    aboutFeature1: "Historical standings and head-to-head records across every season",
+    aboutFeature2: "A championships-weighted GOAT ranking — not just win/loss",
+    aboutFeature3: "Automatically generated storylines: your league's most lopsided rivalry, best draft steal, worst bench call, and biggest trade blowout",
+    aboutFeature4: "A Luck Index comparing your actual record to an all-play expected record",
+    aboutFeature5: "Trophy Case, Playoff Bracket, Power Rankings, and Season Trend for every resolved season",
+    aboutFeature6: "Shareable stat cards you can post straight to your league group chat",
     seasonSummary: (season, n) => `Current season: ${season} · ${n} season(s) of history`,
 
     weekRecapTitle: "📅 Week Recap",
@@ -140,6 +149,15 @@ const STRINGS = {
     invalidLeagueId: "Eso no parece un League ID de Sleeper.",
     coachmarkText: "Toca cualquier fila para convertirla en una card compartible",
     coachmarkDismiss: "Descartar",
+
+    aboutTitle: "Qué rastrea Story of My League",
+    aboutIntro: "Pega tu League ID de Sleeper arriba y obtén el historial completo de tu liga de fantasy football — sin configuración, sin cuenta, sin nada que conectar. Es gratis y funciona con cualquier liga de Sleeper.",
+    aboutFeature1: "Standings históricos y récords head-to-head de todas las temporadas",
+    aboutFeature2: "Ranking GOAT ponderado por campeonatos — no solo win/loss",
+    aboutFeature3: "Historias generadas automáticamente: la rivalidad más desigual de tu liga, el mejor robo de draft, el peor banquillo, y el trade más lopsided",
+    aboutFeature4: "Un Índice de Suerte comparando tu récord real contra un récord esperado all-play",
+    aboutFeature5: "Vitrina de Trofeos, Bracket de Playoffs, Power Rankings y Tendencia de Temporada para cada temporada resuelta",
+    aboutFeature6: "Stat cards compartibles que puedes mandar directo al chat de tu liga",
     seasonSummary: (season, n) => `Temporada actual: ${season} · ${n} temporada(s) en el historial`,
 
     weekRecapTitle: "📅 Resumen de la Semana",

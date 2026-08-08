@@ -100,6 +100,14 @@ Bug real encontrado y arreglado en el camino (van dos veces con el mismo patrón
 - **Weekly Awards Row del doc NO se construyó tal cual:** "Closest Call" ya existía (duplicaba Partido Más Cerrado de Week Recap), "Comeback of the Week" no es construible (Sleeper no da progreso in-game, solo score final) — en vez de eso se agregó "🪑 Bench Blunder" como 3er callout dentro de Week Recap (mismo mecanismo que "El Peor Banquillo" pero acotado a la última semana jugada, reusa los matchups ya fetcheados).
 - Bug real encontrado en el camino: para una temporada sin empezar, Sleeper pre-genera los matchups de todas las semanas con `matchup_id` real pero `points: 0` — el helper compartido de Season Trend/Luck Index/Power Rankings los contaba como "semanas jugadas" (mostraba 13 semanas de 0-0 para la liga 2026 que ni ha arrancado). Mismo criterio que ya se había resuelto para Week Recap (exigir `points > 0`, no solo `matchup_id`), aplicado también aquí.
 
+**Branding movido al dominio** — las 5 referencias a "Fantasy League Intelligence" en la app (title, H1, footer de las stat cards, título del Web Share, log de arranque) ahora dicen `www.storyofmyleague.com`, a pedido explícito de Alex — las stat cards son la razón principal, ese footer viaja con la imagen a donde sea que se comparta.
+
+**SEO audit + quick wins shipped** (vía `/marketing:seo-audit`) — el sitio no tenía meta description, Open Graph, robots.txt, sitemap.xml, favicon, structured data, ni contenido estático indexable (SPA: todo el contenido real requiere JS + interacción). Se agregaron los 6: meta description + OG/Twitter tags + canonical, JSON-LD `WebApplication`, favicon vía data-URI del emoji 🏈 (sin asset nuevo), `robots.txt`/`sitemap.xml`, y una sección `#about-section` con copy estático (siempre visible, no depende de JS) listando las features — le da a los crawlers y a visitantes fríos algo real que leer antes de meter un League ID.
+
+**Nota de diseño:** el `<title>` del `<head>` SÍ quedó distinto del H1 — el H1 sigue diciendo literalmente "www.storyofmyleague.com" (como pidió Alex), pero el `<title>` (lo que ve Google/la pestaña) es "Story of My League — Fantasy Football League History, Stats & GOAT Tracker", con keywords, porque un `<title>` que es solo el dominio pelón es activamente malo para SEO/CTR. Son dos elementos con trabajos distintos, no una contradicción de la instrucción original.
+
+**Pendiente, no bloqueante:** `og:image`/`twitter:image` no se agregaron — no hay un asset de preview real todavía (requeriría generar una imagen estática, y el proyecto evita agregar Puppeteer/headless-browser al servidor a propósito). Investigar Search Console una vez que el dominio esté indexado.
+
 **Próximo paso:** v3 (capa de AI/Claude) es lo siguiente en el roadmap versionado — sin decidir todavía, preguntar antes de asumir.
 
 ## Notas
