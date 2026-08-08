@@ -13,6 +13,8 @@ const STRINGS = {
     loading: "Loading...",
     unknownError: "Unknown error",
     invalidLeagueId: "That doesn't look like a Sleeper League ID.",
+    coachmarkText: "Tap any row to turn it into a shareable card",
+    coachmarkDismiss: "Dismiss",
     seasonSummary: (season, n) => `Current season: ${season} · ${n} season(s) of history`,
 
     weekRecapTitle: "📅 Week Recap",
@@ -103,6 +105,8 @@ const STRINGS = {
     loading: "Cargando...",
     unknownError: "Error desconocido",
     invalidLeagueId: "Eso no parece un League ID de Sleeper.",
+    coachmarkText: "Toca cualquier fila para convertirla en una card compartible",
+    coachmarkDismiss: "Descartar",
     seasonSummary: (season, n) => `Temporada actual: ${season} · ${n} temporada(s) en el historial`,
 
     weekRecapTitle: "📅 Resumen de la Semana",

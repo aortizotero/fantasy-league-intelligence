@@ -233,6 +233,37 @@ td.depth-max { color: var(--accent); font-weight: 700; }
 td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--accent); }
 .card-hint-tap { text-align: center; margin: 0 0 12px; }
 
+/* Onboarding coachmark — the ONE place a solid (not tinted) accent fill is
+   used, so it reads as transient UI chrome pointing at something, not as
+   page content. Shown once via localStorage, dismissed by its own button
+   or by the user actually tapping a row (the thing it's telling them to do). */
+.coachmark {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-radius: var(--radius-pill);
+  padding: 8px 8px 8px 16px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.coachmark[hidden] { display: none; }
+.coachmark button {
+  background: rgba(5, 19, 11, 0.15);
+  color: inherit;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.coachmark button:hover { opacity: 1; background: rgba(5, 19, 11, 0.25); }
+
 .season-header {
   display: flex;
   align-items: center;

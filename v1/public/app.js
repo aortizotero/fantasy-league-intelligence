@@ -54,10 +54,32 @@ async function loadLeague(leagueId) {
     if (window.initMyTeam) window.initMyTeam(data, leagueId);
     statusEl.textContent = "";
     results.hidden = false;
+    maybeShowCoachmark();
   } catch (err) {
     statusEl.textContent = "⚠️ " + err.message;
   }
 }
+
+// Shown once, the first time results ever render for this browser — points
+// at the same affordance the quieter permanent hint below the GOAT table
+// already describes, just loud enough that a first-time visitor notices it.
+const COACHMARK_SEEN_KEY = "fli:coachmarkSeen";
+const coachmarkEl = document.getElementById("coachmark");
+
+function maybeShowCoachmark() {
+  if (localStorage.getItem(COACHMARK_SEEN_KEY)) return;
+  coachmarkEl.hidden = false;
+}
+
+function dismissCoachmark() {
+  coachmarkEl.hidden = true;
+  localStorage.setItem(COACHMARK_SEEN_KEY, "1");
+}
+
+document.getElementById("coachmark-dismiss").addEventListener("click", dismissCoachmark);
+document.addEventListener("click", (e) => {
+  if (!coachmarkEl.hidden && e.target.closest("[data-card]")) dismissCoachmark();
+});
 
 function render(data) {
   document.getElementById("league-info").innerHTML = `
