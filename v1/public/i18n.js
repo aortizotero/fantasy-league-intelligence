@@ -140,6 +140,8 @@ const STRINGS = {
     aiAnalyzeBtn: "🤖 Analyze with AI",
     aiAnalyzing: "Analyzing…",
     aiError: "Couldn't generate the analysis. Try again.",
+    tradeTrackerScopeLeague: "Last 5 league trades",
+    tradeTrackerScopeTeam: (name) => `${name}'s last 5 trades`,
   },
 
   es: {
@@ -277,6 +279,8 @@ const STRINGS = {
     aiAnalyzeBtn: "🤖 Analizar con IA",
     aiAnalyzing: "Analizando…",
     aiError: "No se pudo generar el análisis. Intenta de nuevo.",
+    tradeTrackerScopeLeague: "Últimos 5 trades de la liga",
+    tradeTrackerScopeTeam: (name) => `Últimos 5 trades de ${name}`,
   },
 };
 

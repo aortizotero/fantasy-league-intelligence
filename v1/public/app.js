@@ -5,6 +5,8 @@ const leagueIdInput = document.getElementById("league-id");
 const leagueIdError = document.getElementById("league-id-error");
 
 let activeLeagueId = null;
+let allTrades = []; // full tradeTracker list from the last load — renderTradeTracker() filters/slices from this, no re-fetch needed
+const TRADE_TRACKER_LIMIT = 5;
 
 // Sleeper League IDs are numeric snowflake-style IDs (18-19 digits in
 // practice). This isn't a hard spec, just enough to catch "pasted the wrong
@@ -134,8 +136,26 @@ function render(data) {
   toggleSection("power-rankings-section", "power-rankings", data.powerRankings, powerRankingsTable, true);
   toggleSection("season-trend-section", "season-trend", data.seasonTrend, seasonTrendHtml);
   toggleSection("luck-index-section", "luck-index", data.luckIndex, luckIndexHtml);
-  toggleSection("trade-tracker-section", "trade-tracker", data.tradeTracker, tradeTrackerHtml, false, true);
+  allTrades = data.tradeTracker || [];
+  renderTradeTracker(null, null);
 }
+
+// Last N trades, league-wide by default or scoped to one manager (either
+// side of the trade) when "Mi equipo" has a selection. Trades are already
+// sorted newest-first by computeTradeTracker, so slicing after filtering
+// keeps them in order. filterName is the already-resolved display name for
+// the scope hint — myteam.js has it on hand from its own ownerId lookup,
+// so this doesn't need to re-derive it.
+function filterAndLimitTrades(ownerId) {
+  const filtered = ownerId ? allTrades.filter((t) => t.sideA.ownerId === ownerId || t.sideB.ownerId === ownerId) : allTrades;
+  return filtered.slice(0, TRADE_TRACKER_LIMIT);
+}
+
+function renderTradeTracker(ownerId, filterName) {
+  const trades = filterAndLimitTrades(ownerId);
+  toggleSection("trade-tracker-section", "trade-tracker", trades, (t) => tradeTrackerHtml(t, ownerId ? filterName : null), false, true);
+}
+window.renderTradeTracker = renderTradeTracker;
 
 // Shows/hides a section based on whether its data is present, and renders
 // into it when shown. `wrapScroll` scrollWraps the table; `allowEmpty`
@@ -363,9 +383,10 @@ function luckIndexHtml(luckIndex) {
   return `<div class="narrative-grid">${card(t("luckIndexMostUnlucky"), mostUnlucky)}${luckiest !== mostUnlucky ? card(t("luckIndexMostLucky"), luckiest) : ""}</div>`;
 }
 
-function tradeTrackerHtml(trades) {
-  if (!trades.length) return `<p class="hint">${t("tradeTrackerEmpty")}</p>`;
-  return trades
+function tradeTrackerHtml(trades, filterName) {
+  const scopeHint = `<p class="hint trade-tracker-scope">${filterName ? t("tradeTrackerScopeTeam", filterName) : t("tradeTrackerScopeLeague")}</p>`;
+  if (!trades.length) return scopeHint + `<p class="hint">${t("tradeTrackerEmpty")}</p>`;
+  return scopeHint + trades
     .map(
       (trade) => `
     <div class="trade-row">

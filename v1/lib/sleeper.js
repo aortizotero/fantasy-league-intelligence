@@ -1055,8 +1055,8 @@ export async function computeTradeTracker(chain, playersMap) {
     .map((t) => ({
       season: t.season,
       week: t.week,
-      sideA: { displayName: t.winner.owner.displayName, players: namesOf(t.winner.players), value: t.winner.value },
-      sideB: { displayName: t.loser.owner.displayName, players: namesOf(t.loser.players), value: t.loser.value },
+      sideA: { ownerId: t.winner.owner.ownerId, displayName: t.winner.owner.displayName, players: namesOf(t.winner.players), value: t.winner.value },
+      sideB: { ownerId: t.loser.owner.ownerId, displayName: t.loser.owner.displayName, players: namesOf(t.loser.players), value: t.loser.value },
     }));
 }
 
