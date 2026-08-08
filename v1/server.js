@@ -13,6 +13,12 @@ import {
   computeRosterDepth,
   computeDraftPickCapital,
   computeWeekRecap,
+  computeSeasonTrend,
+  computeLuckIndex,
+  computePowerRankings,
+  computeTrophyCase,
+  computePlayoffBracket,
+  computeTradeTracker,
 } from "./lib/sleeper.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -66,12 +72,21 @@ app.get("/api/league/:leagueId", async (req, res) => {
 
     // Roster-building tools — "who's stacked at a position" and "who has
     // extra draft capital" — both scoped to the *current* league (the one
-    // the user actually entered), not the whole historical chain.
-    const [rosterDepth, draftPicks, weekRecap] = await Promise.all([
-      computeRosterDepth(league, playersMap),
-      computeDraftPickCapital(league),
-      computeWeekRecap(league),
-    ]);
+    // the user actually entered), not the whole historical chain. Season
+    // Trend / Luck Index / Power Rankings are also current-season only,
+    // for the same reason.
+    const [rosterDepth, draftPicks, weekRecap, seasonTrend, luckIndex, powerRankings, trophyCase, playoffBracket, tradeTracker] =
+      await Promise.all([
+        computeRosterDepth(league, playersMap),
+        computeDraftPickCapital(league),
+        computeWeekRecap(league, playersMap),
+        computeSeasonTrend(league),
+        computeLuckIndex(league),
+        computePowerRankings(league),
+        computeTrophyCase(chain, historicalStandings),
+        computePlayoffBracket(league),
+        computeTradeTracker(chain, playersMap),
+      ]);
 
     res.json({
       league: { name: league.name, season: league.season, totalSeasons: chain.length },
@@ -84,6 +99,12 @@ app.get("/api/league/:leagueId", async (req, res) => {
       rosterDepth,
       draftPicks,
       weekRecap,
+      seasonTrend,
+      luckIndex,
+      powerRankings,
+      trophyCase,
+      playoffBracket,
+      tradeTracker,
     });
   } catch (err) {
     console.error(err);

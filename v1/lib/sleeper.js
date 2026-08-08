@@ -52,19 +52,34 @@ export function getTradedPicks(leagueId) {
   return fetchJSON(`${BASE}/league/${leagueId}/traded_picks`);
 }
 
-// Finds the championship match (p: 1 = "this match decides 1st place") and
-// returns the winning roster_id, or null if the season has no finished
-// bracket yet (in progress / not started).
-export async function getSeasonChampionRosterId(leagueId) {
-  let bracket;
-  try {
-    bracket = await getWinnersBracket(leagueId);
-  } catch {
-    return null;
-  }
+const bracketCache = new Map(); // league_id -> Promise<bracket|null>
+
+// The bracket is small and reused by several features (champion, runner-up,
+// the bracket visualization itself) — fetch it once per league.
+function getWinnersBracketCached(leagueId) {
+  if (bracketCache.has(leagueId)) return bracketCache.get(leagueId);
+  const promise = getWinnersBracket(leagueId).catch(() => null);
+  bracketCache.set(leagueId, promise);
+  return promise;
+}
+
+// The championship match (p: 1 = "this match decides 1st place"). Winner
+// (`w`) is the champion, loser (`l`) is the runner-up. Returns nulls if the
+// season has no finished bracket yet (in progress / not started).
+async function getFinalMatch(leagueId) {
+  const bracket = await getWinnersBracketCached(leagueId);
   if (!Array.isArray(bracket)) return null;
-  const finalMatch = bracket.find((m) => m.p === 1);
+  return bracket.find((m) => m.p === 1) ?? null;
+}
+
+export async function getSeasonChampionRosterId(leagueId) {
+  const finalMatch = await getFinalMatch(leagueId);
   return finalMatch?.w ?? null;
+}
+
+export async function getSeasonRunnerUpRosterId(leagueId) {
+  const finalMatch = await getFinalMatch(leagueId);
+  return finalMatch?.l ?? null;
 }
 
 // Walks league.previous_league_id backwards to build the full season history.
@@ -93,6 +108,7 @@ export async function getLeagueChain(leagueId) {
 // key space is bounded by how many distinct leagues get queried.
 const rosterMapCache = new Map(); // league_id -> Promise<Map>
 const matchupsCache = new Map(); // `${league_id}:${week}` -> Promise<matchups|null>
+const transactionsCache = new Map(); // `${league_id}:${week}` -> Promise<transactions|null>
 
 // Builds a roster_id -> { ownerId, displayName } map for a single season.
 function buildRosterMap(league) {
@@ -123,6 +139,17 @@ function getMatchupsCached(leagueId, week) {
   if (matchupsCache.has(key)) return matchupsCache.get(key);
   const promise = getMatchups(leagueId, week).catch(() => null); // week not played / not available
   matchupsCache.set(key, promise);
+  return promise;
+}
+
+// Shared by the trade narrative and the full Trade Tracker list, so
+// switching between them (or a single request needing both) doesn't pay
+// for the same per-week transaction fetch twice.
+function getTransactionsCached(leagueId, week) {
+  const key = `${leagueId}:${week}`;
+  if (transactionsCache.has(key)) return transactionsCache.get(key);
+  const promise = getTransactions(leagueId, week).catch(() => null);
+  transactionsCache.set(key, promise);
   return promise;
 }
 
@@ -378,6 +405,220 @@ export async function computeDraftPickCapital(currentLeague) {
     .sort((a, b) => b.netPicks - a.netPicks);
 }
 
+// ---- Shared weekly results for the current season --------------------
+// Season Trend, Luck Index, and Power Rankings all need the same thing:
+// "how many points did each roster score, and did they win, each played
+// week of the current season" — computed once, from matchups already
+// cached by H2H.
+async function getWeeklySeasonResults(league) {
+  const rosterMap = await buildRosterMap(league);
+  const lastWeek = (league.settings?.playoff_week_start || 15) - 1;
+  const weeks = Array.from({ length: Math.max(lastWeek, 0) }, (_, i) => i + 1);
+  const weeklyMatchups = await Promise.all(weeks.map((week) => getMatchupsCached(league.league_id, week)));
+
+  const byRoster = new Map(); // roster_id -> [{ week, points, won }]
+  weeklyMatchups.forEach((matchups, weekIdx) => {
+    if (!matchups || !matchups.length) return;
+    // Sleeper pre-generates the week's matchup shells (real matchup_id,
+    // real pairings) before it's actually played — every roster shows 0
+    // points. Same "ghost week" check as findLastPlayedWeek: without it, a
+    // season that hasn't started yet looks like it has a full 0-0 record.
+    if (!matchups.some((m) => (m.points || 0) > 0)) return;
+    const week = weekIdx + 1;
+    const byMatchupId = new Map();
+    for (const m of matchups) {
+      if (m.matchup_id == null) continue;
+      if (!byMatchupId.has(m.matchup_id)) byMatchupId.set(m.matchup_id, []);
+      byMatchupId.get(m.matchup_id).push(m);
+    }
+    for (const pair of byMatchupId.values()) {
+      if (pair.length !== 2) continue;
+      const [m1, m2] = pair;
+      const p1 = m1.points || 0;
+      const p2 = m2.points || 0;
+      if (!byRoster.has(m1.roster_id)) byRoster.set(m1.roster_id, []);
+      if (!byRoster.has(m2.roster_id)) byRoster.set(m2.roster_id, []);
+      byRoster.get(m1.roster_id).push({ week, points: p1, won: p1 > p2 });
+      byRoster.get(m2.roster_id).push({ week, points: p2, won: p2 > p1 });
+    }
+  });
+
+  return { rosterMap, byRoster };
+}
+
+// Points For by week, per manager — the raw series for the Season Trend
+// sparkline. No smoothing/interpolation, just what actually happened.
+export async function computeSeasonTrend(currentLeague) {
+  const { rosterMap, byRoster } = await getWeeklySeasonResults(currentLeague);
+  return [...rosterMap.values()]
+    .map(({ ownerId, displayName, roster }) => ({
+      ownerId,
+      displayName,
+      weeks: (byRoster.get(roster.roster_id) || []).map((r) => ({ week: r.week, points: r.points })).sort((a, b) => a.week - b.week),
+    }))
+    .filter((t) => t.weeks.length > 0);
+}
+
+const MIN_LUCK_GAMES = 3; // enough played weeks for "luck" to mean something, not noise
+
+// "All-play" schedule luck: each week, compare a team's score against every
+// OTHER team's score that week (not just their one actual opponent) to get
+// an expected win total — then diff it against their real record. A team
+// with a much better all-play record than real record has been playing
+// tough opponents; a team with a worse one has been getting bailed out by
+// a weak schedule.
+export async function computeLuckIndex(currentLeague) {
+  const { rosterMap, byRoster } = await getWeeklySeasonResults(currentLeague);
+
+  const scoresByWeek = new Map(); // week -> [{ rosterId, points }]
+  for (const [rosterId, results] of byRoster.entries()) {
+    for (const r of results) {
+      if (!scoresByWeek.has(r.week)) scoresByWeek.set(r.week, []);
+      scoresByWeek.get(r.week).push({ rosterId, points: r.points });
+    }
+  }
+
+  const rows = [...rosterMap.values()]
+    .map(({ ownerId, displayName, roster }) => {
+      const results = byRoster.get(roster.roster_id) || [];
+      let actualWins = 0;
+      let allPlayWins = 0;
+      let allPlayLosses = 0;
+      let allPlayTies = 0;
+      for (const r of results) {
+        if (r.won) actualWins += 1;
+        for (const other of scoresByWeek.get(r.week) || []) {
+          if (other.rosterId === roster.roster_id) continue;
+          if (r.points > other.points) allPlayWins += 1;
+          else if (r.points < other.points) allPlayLosses += 1;
+          else allPlayTies += 1;
+        }
+      }
+      const games = results.length;
+      const allPlayGames = allPlayWins + allPlayLosses + allPlayTies;
+      const allPlayWinPct = allPlayGames > 0 ? (allPlayWins + allPlayTies * 0.5) / allPlayGames : 0;
+      const expectedWins = Math.round(allPlayWinPct * games * 10) / 10;
+      return {
+        ownerId,
+        displayName,
+        games,
+        actualWins,
+        actualLosses: games - actualWins,
+        expectedWins,
+        luckDelta: Math.round((actualWins - expectedWins) * 10) / 10,
+      };
+    })
+    .filter((r) => r.games >= MIN_LUCK_GAMES);
+
+  rows.sort((a, b) => a.luckDelta - b.luckDelta); // most unlucky first
+  return rows;
+}
+
+// Week-over-week ranking blending record and points-for (not just
+// standings order), so it can show real movement — a team can slide in
+// Power Rankings even after a win, if their point total is thinning out
+// relative to the league.
+export async function computePowerRankings(currentLeague) {
+  const { rosterMap, byRoster } = await getWeeklySeasonResults(currentLeague);
+  const playedWeeks = [...new Set([...byRoster.values()].flatMap((results) => results.map((r) => r.week)))].sort((a, b) => a - b);
+  if (!playedWeeks.length) return [];
+
+  function rankThroughWeek(uptoWeek) {
+    const rosterIds = [...byRoster.keys()];
+    const cumulative = new Map(
+      rosterIds.map((rosterId) => {
+        const results = (byRoster.get(rosterId) || []).filter((r) => r.week <= uptoWeek);
+        const wins = results.filter((r) => r.won).length;
+        const points = results.reduce((sum, r) => sum + r.points, 0);
+        return [rosterId, { wins, points }];
+      })
+    );
+    const byWins = [...rosterIds].sort((a, b) => cumulative.get(b).wins - cumulative.get(a).wins);
+    const byPoints = [...rosterIds].sort((a, b) => cumulative.get(b).points - cumulative.get(a).points);
+    const winRank = new Map(byWins.map((id, i) => [id, i + 1]));
+    const pointsRank = new Map(byPoints.map((id, i) => [id, i + 1]));
+    const combinedRank = rosterIds
+      .map((id) => [id, winRank.get(id) + pointsRank.get(id)])
+      .sort((a, b) => a[1] - b[1])
+      .map(([id]) => id);
+    return new Map(combinedRank.map((id, i) => [id, i + 1]));
+  }
+
+  const latestWeek = playedWeeks[playedWeeks.length - 1];
+  const previousWeek = playedWeeks.length > 1 ? playedWeeks[playedWeeks.length - 2] : null;
+  const currentRank = rankThroughWeek(latestWeek);
+  const previousRank = previousWeek != null ? rankThroughWeek(previousWeek) : null;
+
+  return [...rosterMap.values()]
+    .map(({ ownerId, displayName, roster }) => {
+      const rank = currentRank.get(roster.roster_id);
+      const prevRank = previousRank?.get(roster.roster_id) ?? null;
+      return { ownerId, displayName, rank, movement: prevRank != null ? prevRank - rank : null };
+    })
+    .sort((a, b) => a.rank - b.rank);
+}
+
+// ---- Trophy Case & Playoff Bracket ------------------------------------
+const runnerUpCache = new Map(); // league_id -> Promise<ownerId|null>
+
+function getRunnerUpsBySeasonIndex(chain) {
+  return Promise.all(
+    chain.map((league) => {
+      if (runnerUpCache.has(league.league_id)) return runnerUpCache.get(league.league_id);
+      const promise = Promise.all([buildRosterMap(league), getSeasonRunnerUpRosterId(league.league_id)]).then(
+        ([rosterMap, runnerUpRosterId]) => (runnerUpRosterId == null ? null : rosterMap.get(runnerUpRosterId)?.ownerId ?? null)
+      );
+      runnerUpCache.set(league.league_id, promise);
+      return promise;
+    })
+  );
+}
+
+// Per-season awards beyond just the champion: runner-up, who scored the
+// most points that season (not necessarily the #1 seed), and the Wooden
+// Spoon (last place by the same record+points sort already used everywhere
+// else). Only includes seasons whose bracket has actually resolved.
+export async function computeTrophyCase(chain, historicalStandings) {
+  const championsBySeasonIndex = await getChampionsBySeasonIndex(chain);
+  const runnerUpsBySeasonIndex = await getRunnerUpsBySeasonIndex(chain);
+
+  const trophies = [];
+  for (let i = 0; i < historicalStandings.length; i += 1) {
+    const championOwnerId = championsBySeasonIndex[i];
+    if (!championOwnerId) continue;
+    const { season, standings } = historicalStandings[i];
+    if (!standings.length) continue;
+
+    const champion = standings.find((s) => s.ownerId === championOwnerId);
+    const runnerUpOwnerId = runnerUpsBySeasonIndex[i];
+    const runnerUp = runnerUpOwnerId ? standings.find((s) => s.ownerId === runnerUpOwnerId) ?? null : null;
+    const mostPoints = [...standings].sort((a, b) => b.pointsFor - a.pointsFor)[0];
+    const woodenSpoon = standings[standings.length - 1];
+
+    trophies.push({ season, champion, runnerUp, mostPoints, woodenSpoon });
+  }
+  return trophies.reverse(); // most recent season first
+}
+
+// Raw bracket for the current season, with roster_ids resolved to display
+// names — text-and-line rendering happens client-side.
+export async function computePlayoffBracket(currentLeague) {
+  const bracket = await getWinnersBracketCached(currentLeague.league_id);
+  if (!Array.isArray(bracket) || !bracket.length) return null;
+
+  const rosterMap = await buildRosterMap(currentLeague);
+  const nameFor = (rosterId) => (rosterId != null ? rosterMap.get(rosterId)?.displayName ?? null : null);
+
+  return bracket.map((m) => ({
+    match: m.m,
+    round: m.r,
+    place: m.p ?? null,
+    team1: nameFor(m.t1),
+    team2: nameFor(m.t2),
+    winner: nameFor(m.w),
+  }));
+}
+
 // ---- Week recap -----------------------------------------------------------
 // Results, biggest blowout, and closest game for the most recently played
 // week of the *current* season. Searches backward from a generous cap
@@ -401,7 +642,7 @@ async function findLastPlayedWeek(league) {
   return null;
 }
 
-export async function computeWeekRecap(currentLeague) {
+export async function computeWeekRecap(currentLeague, playersMap) {
   const found = await findLastPlayedWeek(currentLeague);
   if (!found) return null; // nothing played yet this season
 
@@ -430,7 +671,48 @@ export async function computeWeekRecap(currentLeague) {
   const blowout = [...results].sort((a, b) => b.margin - a.margin)[0];
   const tightest = [...results].sort((a, b) => a.margin - b.margin)[0];
 
-  return { season: currentLeague.season, week: found.week, results, blowout, tightest };
+  // Bench Blunder — same "worst starter vs best bench" mechanic as the
+  // all-time "Worst Bench Call" narrative, scoped to just this one week's
+  // matchups (already fetched above, no extra network cost).
+  let benchBlunder = null;
+  if (playersMap) {
+    for (const m of found.matchups) {
+      const owner = rosterMap.get(m.roster_id);
+      if (!owner) continue;
+      const points = m.players_points || {};
+      const starters = (m.starters || []).filter((id) => id && id !== "0");
+      const bench = (m.players || []).filter((id) => id && !starters.includes(id));
+      if (!starters.length || !bench.length) continue;
+
+      let worstStarter = null;
+      for (const id of starters) {
+        const pts = points[id] ?? 0;
+        if (!worstStarter || pts < worstStarter.pts) worstStarter = { id, pts };
+      }
+      let bestBench = null;
+      for (const id of bench) {
+        const pts = points[id] ?? 0;
+        if (!bestBench || pts > bestBench.pts) bestBench = { id, pts };
+      }
+      const regret = bestBench.pts - worstStarter.pts;
+      if (regret >= MIN_BENCH_REGRET && (!benchBlunder || regret > benchBlunder.regret)) {
+        benchBlunder = { owner, regret, benchedId: bestBench.id, benchedPts: bestBench.pts, starterId: worstStarter.id, starterPts: worstStarter.pts };
+      }
+    }
+    if (benchBlunder) {
+      const playerName = (id) => playersMap.get(id)?.name || `Player ${id}`;
+      benchBlunder = {
+        displayName: benchBlunder.owner.displayName,
+        starterName: playerName(benchBlunder.starterId),
+        starterPts: benchBlunder.starterPts,
+        benchedName: playerName(benchBlunder.benchedId),
+        benchedPts: benchBlunder.benchedPts,
+        regret: benchBlunder.regret,
+      };
+    }
+  }
+
+  return { season: currentLeague.season, week: found.week, results, blowout, tightest, benchBlunder };
 }
 
 // ---- Player-level narratives (v2) --------------------------------------
@@ -687,11 +969,16 @@ async function computeDraftNarratives(chain, playersMap, lang) {
 // per-roster-per-week point accumulation as the draft narratives above, so
 // a player traded again later (or dropped) naturally stops accruing value
 // for a roster the moment they leave it.
-const MIN_TRADE_VALUE_GAP = 30; // points — filters out roughly-even trades
+const MIN_TRADE_VALUE_GAP = 30; // points — filters out roughly-even trades, for the NARRATIVE only
 
-async function computeTradeNarratives(chain, playersMap, lang) {
-  const tr = (en, es) => (lang === "es" ? es : en);
-  let mostLopsided = null; // { gap, season, winner: {owner, players, value}, loser: {...} }
+// Every straightforward 2-team, players-only completed trade across the
+// chain, each side's post-trade production already computed. No gap
+// filtering here — that's specific to "is this worth telling as a
+// narrative", not to whether a trade counts for a full trade log. Shared by
+// computeTradeNarratives (single most lopsided) and computeTradeTracker
+// (the full list), so the per-week transaction fetch only happens once.
+async function collectTrades(chain) {
+  const trades = []; // { season, week, winner: {owner, players, value}, loser: {...}, gap }
 
   for (const league of chain) {
     const rosterMap = await buildRosterMap(league);
@@ -711,15 +998,12 @@ async function computeTradeNarratives(chain, playersMap, lang) {
       }
     }
 
-    let weeklyTransactions;
-    try {
-      weeklyTransactions = await Promise.all(weeks.map((week) => getTransactions(league.league_id, week)));
-    } catch {
-      continue;
-    }
+    const weeklyTransactions = await Promise.all(weeks.map((week) => getTransactionsCached(league.league_id, week)));
 
-    for (const transactions of weeklyTransactions) {
-      if (!transactions) continue;
+    weeklyTransactions.forEach((transactions, weekIdx) => {
+      if (!transactions) return;
+      const week = weekIdx + 1;
+
       for (const t of transactions) {
         if (t.type !== "trade" || t.status !== "complete") continue;
         // Picks/FAAB carry value our points-only metric can't see — skip
@@ -743,19 +1027,43 @@ async function computeTradeNarratives(chain, playersMap, lang) {
         const valueA = playersA.reduce((sum, id) => sum + (valueByRosterPlayer.get(`${rosterA}:${id}`) || 0), 0);
         const valueB = playersB.reduce((sum, id) => sum + (valueByRosterPlayer.get(`${rosterB}:${id}`) || 0), 0);
         const gap = Math.abs(valueA - valueB);
-        if (gap < MIN_TRADE_VALUE_GAP) continue;
 
         const winnerIsA = valueA >= valueB;
-        const entry = {
-          gap,
+        trades.push({
           season: league.season,
+          week,
+          gap,
           winner: { owner: winnerIsA ? ownerA : ownerB, players: winnerIsA ? playersA : playersB, value: winnerIsA ? valueA : valueB },
           loser: { owner: winnerIsA ? ownerB : ownerA, players: winnerIsA ? playersB : playersA, value: winnerIsA ? valueB : valueA },
-        };
-        if (!mostLopsided || gap > mostLopsided.gap) mostLopsided = entry;
+        });
       }
-    }
+    });
   }
+
+  return trades;
+}
+
+// Full trade log for the Trade Tracker section — every trade found, most
+// recent first, with player names resolved for display.
+export async function computeTradeTracker(chain, playersMap) {
+  const trades = await collectTrades(chain);
+  const playerName = (id) => playersMap.get(id)?.name || `Player ${id}`;
+  const namesOf = (ids) => ids.map(playerName).join(", ");
+
+  return trades
+    .sort((a, b) => (b.season === a.season ? b.week - a.week : b.season.localeCompare(a.season)))
+    .map((t) => ({
+      season: t.season,
+      week: t.week,
+      sideA: { displayName: t.winner.owner.displayName, players: namesOf(t.winner.players), value: t.winner.value },
+      sideB: { displayName: t.loser.owner.displayName, players: namesOf(t.loser.players), value: t.loser.value },
+    }));
+}
+
+async function computeTradeNarratives(chain, playersMap, lang) {
+  const tr = (en, es) => (lang === "es" ? es : en);
+  const trades = await collectTrades(chain);
+  const mostLopsided = trades.filter((t) => t.gap >= MIN_TRADE_VALUE_GAP).reduce((best, t) => (!best || t.gap > best.gap ? t : best), null);
 
   if (!mostLopsided) return [];
 

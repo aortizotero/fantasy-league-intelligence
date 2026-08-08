@@ -19,6 +19,7 @@ const STRINGS = {
 
     weekRecapTitle: "📅 Week Recap",
     weekLabel: (week, season) => `Week ${week} — ${season}`,
+    weekShort: (week) => `Week ${week}`,
     blowoutLabel: "💥 Blowout of the week:",
     closestLabel: "😰 Closest game:",
     marginSuffix: "pt margin",
@@ -95,6 +96,38 @@ const STRINGS = {
     cardWeekEyebrow: (week, league) => `📅 Week ${week} — ${league}`,
     cardBlowoutTitle: "💥 Blowout of the Week",
     cardClosestTitle: "😰 Closest Game",
+
+    benchBlunderLabel: "🪑 Bench Blunder:",
+    benchBlunderDetail: (name, starter, starterPts, benched, benchedPts, regret) =>
+      `${name} started ${starter} (${starterPts.toFixed(1)} pts) over ${benched} (${benchedPts.toFixed(1)} pts) — ${regret.toFixed(1)} pts left on the bench.`,
+
+    trophyCaseTitle: "🏆 Trophy Case",
+    trophyChampion: "🏆 Champion",
+    trophyRunnerUp: "🥈 Runner-up",
+    trophyMostPoints: "🎖️ Most Points",
+    trophyWoodenSpoon: "💀 Wooden Spoon",
+
+    bracketTitle: "🗂️ Playoff Bracket",
+    bracketHint: "Current season only.",
+    bracketTbd: "TBD",
+    bracketRound: (r) => `Round ${r}`,
+
+    powerRankingsTitle: "📊 Power Rankings",
+    powerRankingsHint: "Blends record and points-for — not the same as the standings table. Movement since last week.",
+
+    seasonTrendTitle: "📈 Season Trend",
+    seasonTrendHint: "Points For by week, current season.",
+
+    luckIndexTitle: "🍀 Luck Index",
+    luckIndexHint: "Expected record vs. actual, based on how you'd have done against every team's score each week — not just your real opponent.",
+    luckIndexMostUnlucky: "🍀 Most Unlucky",
+    luckIndexMostLucky: "🐰 Luckiest",
+    luckIndexDetail: (name, actual, expected) => `${name} — actual record ${actual}, expected ${expected} based on schedule luck.`,
+
+    tradeTrackerTitle: "🔄 Trade Tracker",
+    tradeTrackerEmpty: "No trades on record.",
+    tradeTrackerReceived: "received",
+    tradeTrackerFor: "for",
   },
 
   es: {
@@ -111,6 +144,7 @@ const STRINGS = {
 
     weekRecapTitle: "📅 Resumen de la Semana",
     weekLabel: (week, season) => `Semana ${week} — ${season}`,
+    weekShort: (week) => `Semana ${week}`,
     blowoutLabel: "💥 Golpe de la semana:",
     closestLabel: "😰 Partido más cerrado:",
     marginSuffix: "pts de diferencia",
@@ -187,6 +221,38 @@ const STRINGS = {
     cardWeekEyebrow: (week, league) => `📅 Semana ${week} — ${league}`,
     cardBlowoutTitle: "💥 Golpe de la Semana",
     cardClosestTitle: "😰 Partido Más Cerrado",
+
+    benchBlunderLabel: "🪑 Peor Banquillo:",
+    benchBlunderDetail: (name, starter, starterPts, benched, benchedPts, regret) =>
+      `${name} tituló a ${starter} (${starterPts.toFixed(1)} pts) sobre ${benched} (${benchedPts.toFixed(1)} pts) — ${regret.toFixed(1)} pts dejados en la banca.`,
+
+    trophyCaseTitle: "🏆 Vitrina de Trofeos",
+    trophyChampion: "🏆 Campeón",
+    trophyRunnerUp: "🥈 Subcampeón",
+    trophyMostPoints: "🎖️ Más Puntos",
+    trophyWoodenSpoon: "💀 Cuchara de Palo",
+
+    bracketTitle: "🗂️ Bracket de Playoffs",
+    bracketHint: "Solo temporada actual.",
+    bracketTbd: "Por definir",
+    bracketRound: (r) => `Ronda ${r}`,
+
+    powerRankingsTitle: "📊 Power Rankings",
+    powerRankingsHint: "Combina récord y puntos anotados — no es lo mismo que la tabla de standings. Movimiento desde la semana pasada.",
+
+    seasonTrendTitle: "📈 Tendencia de Temporada",
+    seasonTrendHint: "Puntos anotados por semana, temporada actual.",
+
+    luckIndexTitle: "🍀 Índice de Suerte",
+    luckIndexHint: "Récord esperado vs. real, basado en cómo te hubiera ido contra el puntaje de todos los equipos cada semana — no solo tu rival real.",
+    luckIndexMostUnlucky: "🍀 El Más Desafortunado",
+    luckIndexMostLucky: "🐰 El Más Suertudo",
+    luckIndexDetail: (name, actual, expected) => `${name} — récord real ${actual}, esperado ${expected} según la suerte del calendario.`,
+
+    tradeTrackerTitle: "🔄 Historial de Trades",
+    tradeTrackerEmpty: "No hay trades registrados.",
+    tradeTrackerReceived: "recibió",
+    tradeTrackerFor: "a cambio de",
   },
 };
 

@@ -7,6 +7,10 @@
   --accent: #00c46a;
   --accent-contrast: #05130b;
   --error: #e5484d;
+  /* Desaturated, distinct from --error — Power Rankings "down" arrow is the
+     only OTHER place non-accent color is allowed, and it must never be
+     confused with the form-validation error state. */
+  --negative: #a35c5e;
   --radius-control: 8px;
   --radius-card: 12px;
   --radius-pill: 20px;
@@ -449,6 +453,56 @@ th.is-me { color: var(--accent); }
 .narrative-card.mentions-me {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px rgba(0, 196, 106, 0.4);
+}
+
+/* ---- Trophy Case ------------------------------------------------------ */
+.trophy-card { display: flex; flex-direction: column; gap: 10px; }
+.trophy-slot { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.trophy-label { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+.trophy-name { font-weight: 600; text-align: right; }
+.trophy-extra { font-size: 11px; }
+
+/* ---- Playoff Bracket ---------------------------------------------------
+   Text-and-line: one column per round, no scoreboard chrome. */
+.bracket { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 4px; }
+.bracket-round { display: flex; flex-direction: column; gap: 14px; min-width: 160px; }
+.bracket-round-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.bracket-match {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.bracket-team { padding: 8px 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+.bracket-team:last-child { border-bottom: none; }
+.bracket-team.won { background: rgba(0, 196, 106, 0.12); color: var(--accent); font-weight: 700; }
+
+/* ---- Power Rankings ----------------------------------------------------
+   Movement arrows: accent up, muted dash flat, desaturated red down — the
+   only other place a non-accent color is used, and it never means "loss"
+   anywhere else in the app. */
+.power-up { color: var(--accent); font-weight: 700; }
+.power-down { color: var(--negative); font-weight: 700; }
+.power-flat { color: var(--muted); }
+
+/* ---- Season Trend -------------------------------------------------------
+   Simple SVG sparkline, no axes/gridlines — the shape is the point. */
+.trend-list { display: flex; flex-direction: column; gap: 10px; }
+.trend-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.trend-name { font-size: 13px; flex-shrink: 0; }
+.sparkline { width: 160px; height: 32px; flex-shrink: 0; }
+.sparkline polyline { fill: none; stroke: var(--accent); stroke-width: 2; }
+
+/* ---- Trade Tracker ------------------------------------------------------ */
+.trade-row { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.trade-row:last-child { border-bottom: none; }
+.trade-meta { margin-bottom: 6px; }
+.trade-sides { display: flex; align-items: center; gap: 12px; }
+.trade-side { flex: 1; font-size: 14px; line-height: 1.4; }
+.trade-vs { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+
+@media (max-width: 480px) {
+  .trade-sides { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .trade-vs { display: none; }
 }
 
 @media (max-width: 480px) {

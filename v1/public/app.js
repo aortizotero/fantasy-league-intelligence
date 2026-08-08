@@ -128,6 +128,29 @@ function render(data) {
 
   document.getElementById("roster-depth").innerHTML = scrollWrap(rosterDepthTable(data.rosterDepth));
   document.getElementById("draft-picks").innerHTML = scrollWrap(draftPicksTable(data.draftPicks));
+
+  toggleSection("trophy-case-section", "trophy-case", data.trophyCase, trophyCaseHtml);
+  toggleSection("bracket-section", "playoff-bracket", data.playoffBracket, playoffBracketHtml);
+  toggleSection("power-rankings-section", "power-rankings", data.powerRankings, powerRankingsTable, true);
+  toggleSection("season-trend-section", "season-trend", data.seasonTrend, seasonTrendHtml);
+  toggleSection("luck-index-section", "luck-index", data.luckIndex, luckIndexHtml);
+  toggleSection("trade-tracker-section", "trade-tracker", data.tradeTracker, tradeTrackerHtml, false, true);
+}
+
+// Shows/hides a section based on whether its data is present, and renders
+// into it when shown. `wrapScroll` scrollWraps the table; `allowEmpty`
+// shows the section even with an empty (but non-null) array, for sections
+// with their own "nothing here" copy.
+function toggleSection(sectionId, contentId, dataValue, renderFn, wrapScroll, allowEmpty) {
+  const section = document.getElementById(sectionId);
+  const hasData = dataValue && (allowEmpty || (Array.isArray(dataValue) ? dataValue.length : true));
+  if (!hasData) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  const html = renderFn(dataValue);
+  document.getElementById(contentId).innerHTML = wrapScroll ? scrollWrap(html) : html;
 }
 
 // Results for the most recently played week, plus two callouts (biggest
@@ -153,10 +176,25 @@ function weekRecapHtml(wr) {
     })
     .join("");
 
+  const benchBlunderRow = wr.benchBlunder
+    ? `<div class="week-callout">${t("benchBlunderLabel")} ${escapeHtml(
+        t(
+          "benchBlunderDetail",
+          wr.benchBlunder.displayName,
+          wr.benchBlunder.starterName,
+          wr.benchBlunder.starterPts,
+          wr.benchBlunder.benchedName,
+          wr.benchBlunder.benchedPts,
+          wr.benchBlunder.regret
+        )
+      )}</div>`
+    : "";
+
   return `
     <p class="hint">${escapeHtml(t("weekLabel", wr.week, wr.season))}</p>
     <div class="week-callout">${t("blowoutLabel")} ${matchupLine(wr.blowout)} (${wr.blowout.margin.toFixed(1)} ${t("marginSuffix")})</div>
     <div class="week-callout">${t("closestLabel")} ${matchupLine(wr.tightest)} (${wr.tightest.margin.toFixed(1)} ${t("marginSuffix")})</div>
+    ${benchBlunderRow}
     <div class="week-results">${rows}</div>
     <button class="card-trigger-btn" data-card="week" type="button">${t("shareRecap")}</button>
   `;
@@ -205,6 +243,141 @@ function draftPicksTable(draftPicks) {
     })
     .join("");
   return `<table><thead><tr><th>${t("colManagerHeader")}</th><th>${t("colNetPicks")}</th><th>${t("colDetail")}</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// One square card per resolved season — same shell as everything else,
+// four small trophies per season instead of a table row.
+function trophyCaseHtml(trophyCase) {
+  const slot = (label, entry, extra) =>
+    entry
+      ? `<div class="trophy-slot"><div class="trophy-label">${label}</div><div class="trophy-name">${escapeHtml(entry.displayName)}</div><div class="trophy-extra hint">${extra}</div></div>`
+      : "";
+
+  return `<div class="narrative-grid">${trophyCase
+    .map((season) => {
+      const record = (s) => `${s.wins}-${s.losses}${s.ties ? `-${s.ties}` : ""}`;
+      return `
+    <div class="narrative-card trophy-card">
+      <div class="narrative-title">${escapeHtml(season.season)}</div>
+      ${slot(t("trophyChampion"), season.champion, record(season.champion))}
+      ${slot(t("trophyRunnerUp"), season.runnerUp, season.runnerUp ? record(season.runnerUp) : "")}
+      ${slot(t("trophyMostPoints"), season.mostPoints, season.mostPoints.pointsFor.toFixed(1))}
+      ${slot(t("trophyWoodenSpoon"), season.woodenSpoon, record(season.woodenSpoon))}
+    </div>`;
+    })
+    .join("")}</div>`;
+}
+
+// Text-and-line bracket: one column per round, matches stacked vertically.
+// Winner gets the accent tint, same pattern as a won matchup-row.
+function playoffBracketHtml(bracket) {
+  const rounds = new Map();
+  for (const m of bracket) {
+    if (!rounds.has(m.round)) rounds.set(m.round, []);
+    rounds.get(m.round).push(m);
+  }
+
+  const teamLine = (name, isWinner) =>
+    `<div class="bracket-team ${isWinner ? "won" : ""}">${name ? escapeHtml(name) : t("bracketTbd")}</div>`;
+
+  const columns = [...rounds.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(
+      ([round, matches]) => `
+    <div class="bracket-round">
+      <div class="bracket-round-label hint">${escapeHtml(t("bracketRound", round))}</div>
+      ${matches
+        .map(
+          (m) => `
+        <div class="bracket-match">
+          ${teamLine(m.team1, m.winner && m.team1 === m.winner)}
+          ${teamLine(m.team2, m.winner && m.team2 === m.winner)}
+        </div>`
+        )
+        .join("")}
+    </div>`
+    )
+    .join("");
+
+  return `<div class="bracket">${columns}</div>`;
+}
+
+function powerRankingsTable(rankings) {
+  const rows = rankings
+    .map((r) => {
+      let movementHtml = `<span class="power-flat">—</span>`;
+      if (r.movement > 0) movementHtml = `<span class="power-up">▲ ${r.movement}</span>`;
+      else if (r.movement < 0) movementHtml = `<span class="power-down">▼ ${Math.abs(r.movement)}</span>`;
+      return `
+    <tr data-owner-id="${escapeHtml(r.ownerId)}">
+      <td>${r.rank}</td>
+      <td>${escapeHtml(r.displayName)}</td>
+      <td>${movementHtml}</td>
+    </tr>`;
+    })
+    .join("");
+  return `<table><thead><tr><th>${t("colNum")}</th><th>${t("colManager")}</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// One row per manager, small inline SVG sparkline (no axes/gridlines, per
+// the design system) plotting Points For across the played weeks.
+function seasonTrendHtml(seasonTrend) {
+  const rows = seasonTrend
+    .map((t2) => `
+    <div class="trend-row" data-owner-id="${escapeHtml(t2.ownerId)}">
+      <div class="trend-name">${escapeHtml(t2.displayName)}</div>
+      ${sparklineSvg(t2.weeks.map((w) => w.points))}
+    </div>`)
+    .join("");
+  return `<div class="trend-list">${rows}</div>`;
+}
+
+function sparklineSvg(values) {
+  if (values.length < 2) return "";
+  const w = 160;
+  const h = 32;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const points = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - ((v - min) / range) * h;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return `<svg class="sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${points}" /></svg>`;
+}
+
+// Highlights only — most unlucky and luckiest team, same narrative-card
+// shell as the server-side narratives (this is a data story, not a table).
+function luckIndexHtml(luckIndex) {
+  const mostUnlucky = luckIndex[0];
+  const luckiest = luckIndex[luckIndex.length - 1];
+  const card = (title, row) => `
+    <div class="narrative-card">
+      <div class="narrative-title">${title}</div>
+      <div class="narrative-headline">${escapeHtml(row.displayName)}</div>
+      <div class="narrative-detail">${escapeHtml(t("luckIndexDetail", row.displayName, `${row.actualWins}-${row.actualLosses}`, row.expectedWins))}</div>
+    </div>`;
+  return `<div class="narrative-grid">${card(t("luckIndexMostUnlucky"), mostUnlucky)}${luckiest !== mostUnlucky ? card(t("luckIndexMostLucky"), luckiest) : ""}</div>`;
+}
+
+function tradeTrackerHtml(trades) {
+  if (!trades.length) return `<p class="hint">${t("tradeTrackerEmpty")}</p>`;
+  return trades
+    .map(
+      (trade) => `
+    <div class="trade-row">
+      <div class="trade-meta hint">${escapeHtml(trade.season)} · ${escapeHtml(t("weekShort", trade.week))}</div>
+      <div class="trade-sides">
+        <div class="trade-side"><b>${escapeHtml(trade.sideA.displayName)}</b> ${t("tradeTrackerReceived")} ${escapeHtml(trade.sideA.players)}</div>
+        <div class="trade-vs">⇄</div>
+        <div class="trade-side"><b>${escapeHtml(trade.sideB.displayName)}</b> ${t("tradeTrackerReceived")} ${escapeHtml(trade.sideB.players)}</div>
+      </div>
+    </div>`
+    )
+    .join("");
 }
 
 // Every table on a phone-width screen can still overflow (long names, many
