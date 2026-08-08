@@ -113,5 +113,5 @@ app.get("/api/league/:leagueId", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Fantasy League Intelligence running at http://localhost:${PORT}`);
+  console.log(`www.storyofmyleague.com running at http://localhost:${PORT}`);
 });

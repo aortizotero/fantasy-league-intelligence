@@ -77,7 +77,7 @@ function buildCardHtml(ds) {
 }
 
 function cardShell(inner) {
-  return `<div class="stat-card">${inner}<div class="stat-card-footer">🏈 Fantasy League Intelligence</div></div>`;
+  return `<div class="stat-card">${inner}<div class="stat-card-footer">🏈 www.storyofmyleague.com</div></div>`;
 }
 
 function goatCardHtml(g, leagueName) {
@@ -198,7 +198,7 @@ shareBtn.addEventListener("click", async () => {
     const file = new File([blob], "fantasy-league-card.png", { type: "image/png" });
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: "Fantasy League Intelligence" });
+      await navigator.share({ files: [file], title: "www.storyofmyleague.com" });
       hintEl.textContent = "";
     } else {
       const url = URL.createObjectURL(blob);
