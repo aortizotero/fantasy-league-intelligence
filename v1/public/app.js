@@ -375,10 +375,71 @@ function tradeTrackerHtml(trades) {
         <div class="trade-vs">⇄</div>
         <div class="trade-side"><b>${escapeHtml(trade.sideB.displayName)}</b> ${t("tradeTrackerReceived")} ${escapeHtml(trade.sideB.players)}</div>
       </div>
+      <div class="trade-ai">
+        <button
+          class="ai-analyze-btn"
+          type="button"
+          data-season="${escapeHtml(trade.season)}"
+          data-week="${trade.week}"
+          data-side-a-name="${escapeHtml(trade.sideA.displayName)}"
+          data-side-a-players="${escapeHtml(trade.sideA.players)}"
+          data-side-a-value="${trade.sideA.value}"
+          data-side-b-name="${escapeHtml(trade.sideB.displayName)}"
+          data-side-b-players="${escapeHtml(trade.sideB.players)}"
+          data-side-b-value="${trade.sideB.value}"
+        >${t("aiAnalyzeBtn")}</button>
+        <div class="ai-result" hidden></div>
+      </div>
     </div>`
     )
     .join("");
 }
+
+// Delegated (not per-button) since trade rows are re-rendered wholesale on
+// every language switch / league reload — a listener bound to a specific
+// button node would be orphaned the next time tradeTrackerHtml() runs.
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".ai-analyze-btn");
+  if (!btn) return;
+
+  const resultEl = btn.nextElementSibling;
+  btn.disabled = true;
+  btn.textContent = t("aiAnalyzing");
+  resultEl.hidden = false;
+  resultEl.textContent = t("aiAnalyzing");
+
+  const payload = {
+    season: btn.dataset.season,
+    week: Number(btn.dataset.week),
+    lang: getLang(),
+    sideA: {
+      displayName: btn.dataset.sideAName,
+      players: btn.dataset.sideAPlayers,
+      value: Number(btn.dataset.sideAValue),
+    },
+    sideB: {
+      displayName: btn.dataset.sideBName,
+      players: btn.dataset.sideBPlayers,
+      value: Number(btn.dataset.sideBValue),
+    },
+  };
+
+  try {
+    const res = await fetch("/api/trade-analysis", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || t("aiError"));
+    resultEl.textContent = data.analysis;
+    btn.remove();
+  } catch (err) {
+    resultEl.textContent = err.message || t("aiError");
+    btn.disabled = false;
+    btn.textContent = t("aiAnalyzeBtn");
+  }
+});
 
 // Every table on a phone-width screen can still overflow (long names, many
 // columns) — scope the horizontal scroll to the table itself instead of

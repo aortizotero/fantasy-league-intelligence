@@ -20,12 +20,14 @@ import {
   computePlayoffBracket,
   computeTradeTracker,
 } from "./lib/sleeper.js";
+import { analyzeTrade } from "./lib/claude.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 
 const app = express();
 app.use(express.static(path.join(__dirname, "public")));
+app.use(express.json());
 
 // Everything a league needs in one call: current standings, full season
 // history, head-to-head records, and career (GOAT) rankings.
@@ -109,6 +111,48 @@ app.get("/api/league/:leagueId", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: errors.loadFailed + err.message });
+  }
+});
+
+// AI narrative for one trade the client already knows about (from
+// tradeTracker) — generated on demand rather than for every trade on page
+// load, since it's a paid API call. Validates shape/length rather than
+// trusting the client, since this hits Claude directly and isn't rate-limited.
+function isValidTradeSide(side) {
+  return (
+    side &&
+    typeof side.displayName === "string" &&
+    side.displayName.length <= 100 &&
+    typeof side.players === "string" &&
+    side.players.length <= 500 &&
+    typeof side.value === "number" &&
+    Number.isFinite(side.value)
+  );
+}
+
+app.post("/api/trade-analysis", async (req, res) => {
+  const lang = req.body?.lang === "es" ? "es" : "en";
+  const errors = {
+    en: { badRequest: "Invalid trade data.", notConfigured: "AI analysis isn't configured for this deployment.", failed: "Couldn't generate the analysis. " },
+    es: { badRequest: "Datos de trade inválidos.", notConfigured: "El análisis con IA no está configurado en este deployment.", failed: "No se pudo generar el análisis. " },
+  }[lang];
+
+  const { season, week, sideA, sideB } = req.body || {};
+  const validSeason = typeof season === "string" && season.length <= 10;
+  const validWeek = Number.isInteger(week) && week >= 1 && week <= 18;
+  if (!validSeason || !validWeek || !isValidTradeSide(sideA) || !isValidTradeSide(sideB)) {
+    return res.status(400).json({ error: errors.badRequest });
+  }
+
+  try {
+    const analysis = await analyzeTrade({ season, week, sideA, sideB }, lang);
+    res.json({ analysis });
+  } catch (err) {
+    if (err.message === "AI_NOT_CONFIGURED") {
+      return res.status(503).json({ error: errors.notConfigured });
+    }
+    console.error(err);
+    res.status(500).json({ error: errors.failed + err.message });
   }
 });
 

@@ -137,6 +137,9 @@ const STRINGS = {
     tradeTrackerEmpty: "No trades on record.",
     tradeTrackerReceived: "received",
     tradeTrackerFor: "for",
+    aiAnalyzeBtn: "🤖 Analyze with AI",
+    aiAnalyzing: "Analyzing…",
+    aiError: "Couldn't generate the analysis. Try again.",
   },
 
   es: {
@@ -271,6 +274,9 @@ const STRINGS = {
     tradeTrackerEmpty: "No hay trades registrados.",
     tradeTrackerReceived: "recibió",
     tradeTrackerFor: "a cambio de",
+    aiAnalyzeBtn: "🤖 Analizar con IA",
+    aiAnalyzing: "Analizando…",
+    aiError: "No se pudo generar el análisis. Intenta de nuevo.",
   },
 };
 

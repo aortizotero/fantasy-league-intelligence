@@ -517,6 +517,28 @@ th.is-me { color: var(--accent); }
 .trade-side { flex: 1; font-size: 14px; line-height: 1.4; }
 .trade-vs { color: var(--muted); font-size: 12px; flex-shrink: 0; }
 
+.trade-ai { margin-top: 10px; }
+.ai-analyze-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+}
+.ai-analyze-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); opacity: 1; }
+.ai-analyze-btn:disabled { cursor: default; opacity: 0.6; }
+.ai-result {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--card);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 @media (max-width: 480px) {
   .trade-sides { flex-direction: column; align-items: flex-start; gap: 6px; }
   .trade-vs { display: none; }
