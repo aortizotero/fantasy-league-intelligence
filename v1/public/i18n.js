@@ -12,6 +12,7 @@ const STRINGS = {
     findLeagueId: "Where do I find my League ID?",
     loading: "Loading...",
     unknownError: "Unknown error",
+    invalidLeagueId: "That doesn't look like a Sleeper League ID.",
     seasonSummary: (season, n) => `Current season: ${season} · ${n} season(s) of history`,
 
     weekRecapTitle: "📅 Week Recap",
@@ -101,6 +102,7 @@ const STRINGS = {
     findLeagueId: "¿Dónde encuentro mi League ID?",
     loading: "Cargando...",
     unknownError: "Error desconocido",
+    invalidLeagueId: "Eso no parece un League ID de Sleeper.",
     seasonSummary: (season, n) => `Temporada actual: ${season} · ${n} temporada(s) en el historial`,
 
     weekRecapTitle: "📅 Resumen de la Semana",

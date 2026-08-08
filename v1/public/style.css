@@ -5,6 +5,34 @@
   --text: #e8eaed;
   --muted: #8a8f98;
   --accent: #00c46a;
+  --accent-contrast: #05130b;
+  --error: #e5484d;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-pill: 20px;
+}
+
+/* Light Mode — for daytime shares. Darkened accent (#00a05a vs #00c46a)
+   keeps contrast on a white surface; same radii/spacing/shell, only
+   surfaces and text invert. Defaults to the OS preference, overridable by
+   the toggle (persisted in localStorage, same pattern as the lang toggle). */
+:root[data-theme="light"] {
+  --bg: #f7f8fa;
+  --card: #ffffff;
+  --border: #e2e4e9;
+  --text: #1a1d24;
+  --muted: #6b7280;
+  --accent: #00a05a;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --border: #e2e4e9;
+    --text: #1a1d24;
+    --muted: #6b7280;
+    --accent: #00a05a;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -19,7 +47,7 @@ body {
 }
 
 header { text-align: center; margin-bottom: 32px; position: relative; }
-h1 { margin-bottom: 8px; }
+h1 { margin: 0 0 8px; font-size: 34px; font-weight: 800; }
 .subtitle { color: var(--muted); }
 
 .lang-toggle {
@@ -32,14 +60,14 @@ h1 { margin-bottom: 8px; }
 .lang-toggle button {
   padding: 5px 10px;
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--muted);
   font-weight: 600;
 }
 .lang-toggle button:hover { opacity: 1; color: var(--text); }
-.lang-toggle button.active { background: var(--accent); color: #05130b; border-color: var(--accent); }
+.lang-toggle button.active { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
 
 #league-form {
   display: flex;
@@ -51,19 +79,33 @@ h1 { margin-bottom: 8px; }
 #league-id {
   flex: 1;
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--text);
   font-size: 14px;
 }
+#league-id.invalid { border-color: var(--error); }
+#league-id.invalid:focus { box-shadow: 0 0 0 3px rgba(229, 72, 77, 0.25); }
+.field-error { color: var(--error); font-size: 13px; text-align: center; margin: -4px 0 8px; min-height: 18px; }
+
+/* Focus ring: 3px accent glow at 25% opacity, no radius change. Error state
+   (invalid League ID) reuses the same ring shape in red — the only place
+   red appears in this app; it never means "loss" in a stat. */
+#league-id:focus-visible,
+#my-team-select:focus-visible,
+button:focus-visible,
+.card-trigger-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 196, 106, 0.25);
+}
 
 button {
   padding: 12px 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   border: none;
   background: var(--accent);
-  color: #05130b;
+  color: var(--accent-contrast);
   font-weight: 600;
   cursor: pointer;
 }
@@ -78,7 +120,7 @@ button:hover { opacity: 0.9; }
 section {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   padding: 20px 24px;
   margin-bottom: 20px;
 }
@@ -106,7 +148,7 @@ th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size
   margin-bottom: 16px;
   background: rgba(0, 196, 106, 0.1);
   border: 1px solid rgba(0, 196, 106, 0.35);
-  border-radius: 10px;
+  border-radius: var(--radius-card);
 }
 .goat-hero-emoji { font-size: 40px; line-height: 1; }
 .goat-hero-name { font-size: 20px; font-weight: 700; }
@@ -125,7 +167,7 @@ td.depth-max { color: var(--accent); font-weight: 700; }
 .week-callout {
   background: rgba(0, 196, 106, 0.08);
   border: 1px solid rgba(0, 196, 106, 0.25);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 10px 14px;
   margin-bottom: 8px;
   font-size: 14px;
@@ -168,7 +210,7 @@ td.depth-max { color: var(--accent); font-weight: 700; }
 .narrative-card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-card);
   padding: 18px;
 }
 .narrative-icon { font-size: 28px; margin-bottom: 6px; }
@@ -203,7 +245,7 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
 .card-trigger-btn {
   padding: 6px 12px;
   font-size: 12px;
-  border-radius: 20px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text);
@@ -228,7 +270,7 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
 .card-modal-inner {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   padding: 24px;
   max-width: 400px;
   width: 100%;
@@ -259,15 +301,28 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
   justify-content: center;
 }
 .card-actions button { flex: 1; }
-#card-share { background: #2a2e38; color: var(--text); }
+#card-share { background: var(--border); color: var(--text); }
 #card-hint { min-height: 18px; margin: 10px 0 0; }
 
 /* The card itself — fixed square, captured at pixelRatio:3 by html-to-image
-   for a real ~1080px export while staying compact on screen. */
+   for a real ~1080px export while staying compact on screen. Deliberately
+   NOT theme-reactive: it's a branded shareable asset (posted to WhatsApp/
+   Instagram), so it always renders dark regardless of the viewer's site
+   theme — consistency of the exported image matters more than matching
+   whatever mode the page happened to be in when it was generated. */
 .stat-card {
+  /* Shadow the page-level tokens with fixed dark values so every
+     var(--muted)/var(--accent)/var(--border) used by children below
+     resolves the same way regardless of the page's active theme. */
+  --bg: #0f1115;
+  --card: #171a21;
+  --border: #2a2e38;
+  --text: #e8eaed;
+  --muted: #8a8f98;
+  --accent: #00c46a;
   width: 320px;
   height: 320px;
-  border-radius: 20px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(160deg, #171a21, #0f1115);
   border: 1px solid rgba(0, 196, 106, 0.35);
   display: flex;
@@ -347,7 +402,7 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
 #my-team-section .hint { margin: 0; flex-basis: 100%; }
 #my-team-select {
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);

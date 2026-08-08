@@ -1,15 +1,36 @@
 const form = document.getElementById("league-form");
 const statusEl = document.getElementById("status");
 const results = document.getElementById("results");
+const leagueIdInput = document.getElementById("league-id");
+const leagueIdError = document.getElementById("league-id-error");
 
 let activeLeagueId = null;
 
+// Sleeper League IDs are numeric snowflake-style IDs (18-19 digits in
+// practice). This isn't a hard spec, just enough to catch "pasted the wrong
+// thing" before burning a request on it.
+const LEAGUE_ID_PATTERN = /^\d{10,}$/;
+
 form.addEventListener("submit", (e) => {
   e.preventDefault();
-  const leagueId = document.getElementById("league-id").value.trim();
+  const leagueId = leagueIdInput.value.trim();
   if (!leagueId) return;
+
+  if (!LEAGUE_ID_PATTERN.test(leagueId)) {
+    leagueIdInput.classList.add("invalid");
+    leagueIdError.textContent = t("invalidLeagueId");
+    return;
+  }
+  leagueIdInput.classList.remove("invalid");
+  leagueIdError.textContent = "";
+
   activeLeagueId = leagueId;
   loadLeague(leagueId);
+});
+
+leagueIdInput.addEventListener("input", () => {
+  leagueIdInput.classList.remove("invalid");
+  leagueIdError.textContent = "";
 });
 
 // Re-invoked by i18n.js after a language switch, if a league is already
