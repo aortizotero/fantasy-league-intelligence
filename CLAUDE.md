@@ -34,6 +34,8 @@ Convertir el proyecto en un MCP server propio para que un agente pueda consultar
 
 **v1:** Node.js + Express (backend), JS/HTML/CSS plano sin framework (frontend, a propósito — v1 es sobre la integración de API). Sin autenticación, la API de Sleeper es pública y de solo lectura.
 
+**v3:** `@anthropic-ai/sdk` (oficial) para las llamadas a Claude — ver `lib/claude.js`.
+
 ## Convenciones
 
 - Cache en memoria (`Map`) para rosters/usuarios/matchups dentro de `lib/sleeper.js` — evita refetch repetido de la misma liga en un mismo request. Sin TTL/eviction en v1, es intencional (dataset acotado).
@@ -59,7 +61,7 @@ Verificado en vivo: encontró que a `alexortizotero` le anotó la defensa de Dal
 
 Falla con gracia cuando ESPN no tiene el dato: equipos de defensa (ej. "Dallas Cowboys") no son "athletes" reales en ESPN, y no todos los jugadores traen `espn_id` poblado en el dump de Sleeper (De'Von Achane no lo tenía al momento de probar) — en esos casos la narrativa simplemente se queda en solo-puntos, sin romper nada.
 
-**En vivo:** [storyofmyleague.com](https://storyofmyleague.com) — deploy vía Coolify (self-hosted, VPS propio de Alex) usando `v1/Dockerfile` (Base Directory `/v1`, sin Nixpacks). DNS en GoDaddy (registro A en `@` apuntando al servidor, `www` como CNAME al root). Sin variables de entorno — Sleeper y ESPN son APIs públicas sin auth. SSL automático vía Let's Encrypt (lo maneja Coolify solo).
+**En vivo:** [storyofmyleague.com](https://storyofmyleague.com) — deploy vía Coolify (self-hosted, VPS propio de Alex) usando `v1/Dockerfile` (Base Directory `/v1`, sin Nixpacks). DNS en GoDaddy (registro A en `@` apuntando al servidor, `www` como CNAME al root). SSL automático vía Let's Encrypt (lo maneja Coolify solo). Sleeper y ESPN son APIs públicas sin auth — la única variable de entorno que existe en el proyecto es `ANTHROPIC_API_KEY` (v3, opcional — ver abajo), configurada en las variables de entorno de la app en Coolify.
 
 **Card de Campeón + narrativas de draft shipped** (post-v2, mismo espíritu de "exprimir lo que ya tenemos antes de saltar a v3"):
 - 5ª stat card: **Campeón de Temporada** — distinta de la card de "resumen de temporada" (que muestra top-3 por récord regular sin afirmar quién ganó, a propósito). Esta sí usa el campeón real del bracket de playoffs (`getChampionsBySeasonIndex`, ya existía internamente para GOAT/narrativas, ahora expuesto en el response del API como `champions[]`, paralelo a `historicalStandings[]`). Botón "🏆 Campeón" solo aparece en temporadas con bracket ya resuelto.
@@ -108,7 +110,16 @@ Bug real encontrado y arreglado en el camino (van dos veces con el mismo patrón
 
 **Pendiente, no bloqueante:** `og:image`/`twitter:image` no se agregaron — no hay un asset de preview real todavía (requeriría generar una imagen estática, y el proyecto evita agregar Puppeteer/headless-browser al servidor a propósito). Investigar Search Console una vez que el dominio esté indexado.
 
-**Próximo paso:** v3 (capa de AI/Claude) es lo siguiente en el roadmap versionado — sin decidir todavía, preguntar antes de asumir.
+**v3 (capa de AI) fase 1 shipped — análisis de trades on-demand con Claude** — botón "🤖 Analizar con IA" en cada fila del Trade Tracker que llama a Claude Haiku 4.5 (`lib/claude.js`) para generar un veredicto en lenguaje natural de quién ganó el trade, usando *solo* los mismos datos de puntos-producidos que ya calcula `collectTrades` (el prompt no inventa contexto que no le dimos — lesiones, motivos, etc.). Decisión deliberada de modelo: Haiku 4.5 en vez de un modelo más caro, porque el volumen es bajísimo (análisis bajo demanda, no en cada carga de página) — el costo por narrativa es fracciones de centavo incluso con un modelo más grande, pero Haiku ya es suficiente para un párrafo corto de 3-4 oraciones.
+
+- **On-demand, no generado para cada trade al cargar la página** — es una llamada pagada por trade, así que solo se genera cuando el usuario hace clic. Resultado cacheado en memoria (`Map`, mismo criterio "sin TTL" que el resto de `lib/sleeper.js` — un trade ya jugado no cambia de valor) para que recargar la página o volver a hacer clic no vuelva a facturar.
+- **Endpoint `POST /api/trade-analysis`** en `server.js`: valida forma/longitud del payload (no confía en el cliente — este endpoint le pega directo a Claude y no tiene rate-limiting, así que se limitan tipos, longitudes de string y rango de semana antes de construir el prompt).
+- **Degrada con gracia sin `ANTHROPIC_API_KEY`**: `lib/claude.js` regresa un error tipado (`AI_NOT_CONFIGURED`) que el endpoint traduce a 503 con mensaje bilingüe — el resto de la app funciona igual sin la key, la IA simplemente no está disponible.
+- Verificado en vivo por Alex corriendo el server local con su propia key (`node server.js` + `$env:ANTHROPIC_API_KEY`) contra la liga real — narrativa coherente, botón se reemplaza por el resultado tras generarse, funciona en ambos idiomas.
+
+**Trade Tracker: limitado a los últimos 5, con scope por equipo** — mismo día, extensión pedida sobre el feature anterior. Antes mostraba el historial completo de trades; ahora muestra los 5 más recientes de toda la liga por default, o los 5 más recientes que involucran al manager seleccionado en "Mi equipo" (si cualquiera de los dos lados del trade es ese manager). 100% client-side, reusa `data.tradeTracker` ya cargado — mismo espíritu que las rivalidades personalizadas (ningún llamado nuevo al API). `computeTradeTracker` ahora expone `ownerId` en `sideA`/`sideB` (antes solo mandaba `displayName`) para que el frontend pueda filtrar. `myteam.js` dispara `window.renderTradeTracker(ownerId, displayName)` desde `applyHighlight()` cada vez que cambia la selección, reusando el `displayName` que esa función ya resuelve — un hint arriba de la lista ("Últimos 5 trades de [equipo]" / "Last 5 league trades") deja claro qué se está mostrando.
+
+**Próximo paso:** v3 sigue abierto — evaluar si vale la pena una segunda fase (ej. análisis on-demand también para narrativas de draft, o un resumen de temporada generado por IA) antes de saltar a v4. Sin decidir todavía, preguntar antes de asumir.
 
 ## Notas
 
