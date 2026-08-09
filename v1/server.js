@@ -21,8 +21,10 @@ import {
   computeTradeTracker,
   computeRosterValue,
   computePositionPointsReport,
+  computeRosterPlayerPool,
 } from "./lib/sleeper.js";
-import { analyzeTrade } from "./lib/claude.js";
+import { analyzeTrade, simulateTradeAnalysis } from "./lib/claude.js";
+import { checkTurnstile } from "./lib/turnstile.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -36,9 +38,22 @@ app.use(express.json());
 app.get("/api/league/:leagueId", async (req, res) => {
   const lang = req.query.lang === "es" ? "es" : "en";
   const errors = {
-    en: { notFound: "League not found. Check the League ID.", loadFailed: "Couldn't load the league. " },
-    es: { notFound: "Liga no encontrada. Revisa el League ID.", loadFailed: "No se pudo cargar la liga. " },
+    en: {
+      notFound: "League not found. Check the League ID.",
+      loadFailed: "Couldn't load the league. ",
+      turnstileFailed: "Security check failed. Please try again.",
+    },
+    es: {
+      notFound: "Liga no encontrada. Revisa el League ID.",
+      loadFailed: "No se pudo cargar la liga. ",
+      turnstileFailed: "Falló la verificación de seguridad. Intenta de nuevo.",
+    },
   }[lang];
+
+  const passedTurnstile = await checkTurnstile(req, res);
+  if (!passedTurnstile) {
+    return res.status(403).json({ error: errors.turnstileFailed });
+  }
 
   try {
     const { leagueId } = req.params;
@@ -91,6 +106,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       tradeTracker,
       rosterValue,
       positionPointsReport,
+      rosterPlayerPool,
     ] = await Promise.all([
       computeRosterDepth(league, playersMap),
       computeDraftPickCapital(league),
@@ -103,6 +119,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       computeTradeTracker(chain, playersMap),
       computeRosterValue(league, playersMap),
       computePositionPointsReport(league, playersMap),
+      computeRosterPlayerPool(league, playersMap),
     ]);
 
     res.json({
@@ -124,6 +141,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       tradeTracker,
       rosterValue,
       positionPointsReport,
+      rosterPlayerPool,
     });
   } catch (err) {
     console.error(err);
@@ -164,6 +182,67 @@ app.post("/api/trade-analysis", async (req, res) => {
   try {
     const analysis = await analyzeTrade({ season, week, sideA, sideB }, lang);
     res.json({ analysis });
+  } catch (err) {
+    if (err.message === "AI_NOT_CONFIGURED") {
+      return res.status(503).json({ error: errors.notConfigured });
+    }
+    console.error(err);
+    res.status(500).json({ error: errors.failed + err.message });
+  }
+});
+
+// Hypothetical trade evaluator (Trade Analyzer) — distinct from
+// /api/trade-analysis above, which narrates a trade that already happened.
+// This one takes a proposed combination of players the user picked in the
+// browser and asks Claude to weigh value + points potential + roster need
+// itself (rather than a hand-tuned scoring formula), returning a verdict
+// key plus a written interpretation. Same "validate, don't trust the
+// client" posture as isValidTradeSide, since this also hits Claude
+// directly with no rate-limiting.
+function isValidPickedPlayer(p) {
+  return (
+    p &&
+    typeof p.name === "string" &&
+    p.name.length <= 80 &&
+    typeof p.position === "string" &&
+    p.position.length <= 10 &&
+    typeof p.value === "number" &&
+    Number.isFinite(p.value) &&
+    typeof p.ppg === "number" &&
+    Number.isFinite(p.ppg)
+  );
+}
+
+function isValidSimulatedTeam(team) {
+  return (
+    team &&
+    typeof team.displayName === "string" &&
+    team.displayName.length <= 100 &&
+    Array.isArray(team.players) &&
+    team.players.length >= 1 &&
+    team.players.length <= 6 &&
+    team.players.every(isValidPickedPlayer) &&
+    team.rosterCounts &&
+    typeof team.rosterCounts === "object" &&
+    Object.values(team.rosterCounts).every((n) => Number.isInteger(n) && n >= 0)
+  );
+}
+
+app.post("/api/trade-simulate", async (req, res) => {
+  const lang = req.body?.lang === "es" ? "es" : "en";
+  const errors = {
+    en: { badRequest: "Invalid trade data.", notConfigured: "AI analysis isn't configured for this deployment.", failed: "Couldn't generate the analysis. " },
+    es: { badRequest: "Datos de trade inválidos.", notConfigured: "El análisis con IA no está configurado en este deployment.", failed: "No se pudo generar el análisis. " },
+  }[lang];
+
+  const { offerTeam, requestTeam } = req.body || {};
+  if (!isValidSimulatedTeam(offerTeam) || !isValidSimulatedTeam(requestTeam)) {
+    return res.status(400).json({ error: errors.badRequest });
+  }
+
+  try {
+    const result = await simulateTradeAnalysis({ offerTeam, requestTeam }, lang);
+    res.json(result);
   } catch (err) {
     if (err.message === "AI_NOT_CONFIGURED") {
       return res.status(503).json({ error: errors.notConfigured });

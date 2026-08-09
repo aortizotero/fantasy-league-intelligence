@@ -39,6 +39,10 @@ const STRINGS = {
     myTeamPlaceholder: "— Select your team —",
     myTeamHint: "Highlights your rows in standings, GOAT, and H2H, and flags the stories that mention you.",
 
+    groupRightNow: "🟢 Right Now",
+    groupHistory: "🕰️ League History",
+    groupAnalyze: "🔮 Analyze & Plan",
+
     rivalryTitle: "⚔️ Your Rivalries",
     nemesisTitle: "Your Nemesis",
     victimTitle: "Your Victim",
@@ -70,6 +74,9 @@ const STRINGS = {
     h2hTitle: "Head-to-Head",
     h2hHint: "Record between every pair of managers, across all seasons.",
     shareH2H: "Share this head-to-head",
+
+    seasonFilterLabel: "Season",
+    seasonFilterAll: "All seasons",
 
     historicalStandingsTitle: "Standings by Season",
     champion: "🏆 Champion",
@@ -127,6 +134,7 @@ const STRINGS = {
     trophyRunnerUp: "🥈 Runner-up",
     trophyMostPoints: "🎖️ Most Points",
     trophyWoodenSpoon: "💀 Wooden Spoon",
+    trophyCaseEmptySeason: "This season hasn't crowned a champion yet.",
 
     bracketTitle: "🗂️ Playoff Bracket",
     bracketHint: "Current season only.",
@@ -154,6 +162,22 @@ const STRINGS = {
     aiError: "Couldn't generate the analysis. Try again.",
     tradeTrackerScopeLeague: "Last 5 league trades",
     tradeTrackerScopeTeam: (name) => `${name}'s last 5 trades`,
+    tradeAnalyzerTitle: "🧮 Trade Analyzer",
+    tradeAnalyzerHint: "Pick players to offer and players to request, then get an AI verdict on who wins the trade.",
+    tradeAnalyzerYourTeam: "Your team",
+    tradeAnalyzerTheirTeam: "Their team",
+    tradeAnalyzerSelectTeam: "— Select a team —",
+    tradeAnalyzerPickTeam: "Pick a team to see its roster.",
+    tradeAnalyzerNoPlayers: "This roster has no tradeable players.",
+    tradeAnalyzerYouOffer: "You offer",
+    tradeAnalyzerYouRequest: "You request",
+    tradeAnalyzerTotalsLine: (count, value, ppg) => `${count} player${count === 1 ? "" : "s"}, ${value} value, ${ppg} pts/game`,
+    tradeAnalyzerBtn: "🤖 Analyze Trade with AI",
+    steal_for_you: "🔥 Steal for you",
+    win_for_you: "✅ You win",
+    fair: "⚖️ Fair trade",
+    win_for_them: "❌ They win",
+    steal_for_them: "💀 Fleeced",
   },
 
   es: {
@@ -190,6 +214,10 @@ const STRINGS = {
     myTeamPlaceholder: "— Selecciona tu equipo —",
     myTeamHint: "Resalta tus filas en standings, GOAT y H2H, y marca las historias que te involucran.",
 
+    groupRightNow: "🟢 Ahora Mismo",
+    groupHistory: "🕰️ Historia de la Liga",
+    groupAnalyze: "🔮 Analiza y Planea",
+
     rivalryTitle: "⚔️ Tus Rivalidades",
     nemesisTitle: "Tu Némesis",
     victimTitle: "Tu Víctima",
@@ -221,6 +249,9 @@ const STRINGS = {
     h2hTitle: "Head-to-Head",
     h2hHint: "Récord entre cada par de managers, a través de todas las temporadas.",
     shareH2H: "Compartir este head-to-head",
+
+    seasonFilterLabel: "Temporada",
+    seasonFilterAll: "Todas las temporadas",
 
     historicalStandingsTitle: "Standings por Temporada",
     champion: "🏆 Campeón",
@@ -278,6 +309,7 @@ const STRINGS = {
     trophyRunnerUp: "🥈 Subcampeón",
     trophyMostPoints: "🎖️ Más Puntos",
     trophyWoodenSpoon: "💀 Cuchara de Palo",
+    trophyCaseEmptySeason: "Esta temporada todavía no tiene campeón.",
 
     bracketTitle: "🗂️ Bracket de Playoffs",
     bracketHint: "Solo temporada actual.",
@@ -305,6 +337,22 @@ const STRINGS = {
     aiError: "No se pudo generar el análisis. Intenta de nuevo.",
     tradeTrackerScopeLeague: "Últimos 5 trades de la liga",
     tradeTrackerScopeTeam: (name) => `Últimos 5 trades de ${name}`,
+    tradeAnalyzerTitle: "🧮 Analizador de Trades",
+    tradeAnalyzerHint: "Elige jugadores para ofrecer y jugadores para pedir, y obtén un veredicto de IA sobre quién gana el trade.",
+    tradeAnalyzerYourTeam: "Tu equipo",
+    tradeAnalyzerTheirTeam: "Su equipo",
+    tradeAnalyzerSelectTeam: "— Selecciona un equipo —",
+    tradeAnalyzerPickTeam: "Elige un equipo para ver su roster.",
+    tradeAnalyzerNoPlayers: "Este roster no tiene jugadores tradeables.",
+    tradeAnalyzerYouOffer: "Ofreces",
+    tradeAnalyzerYouRequest: "Pides",
+    tradeAnalyzerTotalsLine: (count, value, ppg) => `${count} jugador${count === 1 ? "" : "es"}, valor ${value}, ${ppg} pts/partido`,
+    tradeAnalyzerBtn: "🤖 Analizar Trade con IA",
+    steal_for_you: "🔥 Robo total para ti",
+    win_for_you: "✅ Ganas el trade",
+    fair: "⚖️ Trade parejo",
+    win_for_them: "❌ Pierdes el trade",
+    steal_for_them: "💀 Te fletaron",
   },
 };
 

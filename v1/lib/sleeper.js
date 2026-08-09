@@ -215,6 +215,14 @@ export async function computeH2H(chain) {
 
       for (const matchups of weeklyMatchups) {
         if (!matchups || matchups.length === 0) continue;
+        // Sleeper pre-generates the whole season's matchup shells (real
+        // matchup_id, real pairings) before any of it is actually played —
+        // every roster shows 0 points. Without this guard, a season that
+        // hasn't started yet (or hasn't reached its later weeks) turns every
+        // still-unplayed pairing into a false "tie" (0-0), inflating tie
+        // counts across the whole H2H matrix. Same ghost-week check already
+        // used by getWeeklySeasonResults/computeSeasonPlayerPpg.
+        if (!matchups.some((m) => (m.points || 0) > 0)) continue;
 
         const byMatchupId = new Map();
         for (const m of matchups) {
@@ -414,6 +422,85 @@ export async function computeRosterValue(currentLeague, playersMap) {
       total += value;
     }
     return { ownerId, displayName, byPosition, total };
+  });
+}
+
+// Season-to-date points per game per player, used by computeRosterPlayerPool
+// as the "points potential" signal for the Trade Analyzer. Walks the same
+// weekly matchups as getWeeklySeasonResults (shared cache, so this costs
+// zero extra network calls when it runs alongside rosterValue/rosterDepth),
+// accumulating every player who appeared in `m.players` (the full roster
+// that week, not just starters — a bench player is still a valid trade
+// piece). Real production so far this season, not a projection.
+async function computeSeasonPlayerPpg(league) {
+  const lastWeek = (league.settings?.playoff_week_start || 15) - 1;
+  const weeks = Array.from({ length: Math.max(lastWeek, 0) }, (_, i) => i + 1);
+  const weeklyMatchups = await Promise.all(weeks.map((week) => getMatchupsCached(league.league_id, week)));
+
+  const byPlayer = new Map(); // playerId -> { points, games }
+  for (const matchups of weeklyMatchups) {
+    if (!matchups || !matchups.length) continue;
+    // Same "ghost week" guard as getWeeklySeasonResults — a season that
+    // hasn't started yet pre-generates 0-point matchup shells.
+    if (!matchups.some((m) => (m.points || 0) > 0)) continue;
+    for (const m of matchups) {
+      const points = m.players_points || {};
+      for (const id of m.players || []) {
+        const entry = byPlayer.get(id) || { points: 0, games: 0 };
+        entry.points += points[id] || 0;
+        entry.games += 1;
+        byPlayer.set(id, entry);
+      }
+    }
+  }
+  return byPlayer;
+}
+
+// Per-player tradeable pool for the Trade Analyzer — the one thing the
+// frontend has never had: individual players with a name and a value,
+// rather than the position-level aggregates rosterDepth/rosterValue expose.
+// Reuses the same numQbs/numTeams/ppr-derived FantasyCalc values as
+// computeRosterValue (same league, same values, no reason to refetch with
+// different settings), plus computeSeasonPlayerPpg for the points-potential
+// signal. Restricted to VALUE_POSITIONS (QB/RB/WR/TE) — same scope
+// computeRosterValue already uses, since FantasyCalc doesn't price K/DEF
+// and PPG isn't a meaningful trade signal for those positions either.
+// Returns null if FantasyCalc is unreachable, same graceful degradation as
+// computeRosterValue — the whole section just doesn't render.
+export async function computeRosterPlayerPool(currentLeague, playersMap) {
+  const rosterMap = await buildRosterMap(currentLeague);
+  const numQbs = deriveNumQbs(currentLeague.roster_positions);
+  const numTeams = currentLeague.total_rosters || rosterMap.size;
+  const ppr = currentLeague.scoring_settings?.rec ?? 0;
+
+  let valuesBySleeperId;
+  try {
+    valuesBySleeperId = await getValuesBySleeperId({ numQbs, numTeams, ppr });
+  } catch {
+    return null;
+  }
+
+  const ppgByPlayer = await computeSeasonPlayerPpg(currentLeague);
+
+  return [...rosterMap.values()].map(({ ownerId, displayName, roster }) => {
+    const players = [];
+    for (const playerId of roster.players || []) {
+      const info = playersMap.get(playerId);
+      const position = info?.position;
+      if (!position || !VALUE_POSITIONS.includes(position)) continue;
+      const { points = 0, games = 0 } = ppgByPlayer.get(playerId) || {};
+      players.push({
+        playerId,
+        name: info.name || playerId,
+        position,
+        nflTeam: info.team,
+        value: valuesBySleeperId.get(playerId) || 0,
+        ppg: games > 0 ? points / games : 0,
+        gamesPlayed: games,
+      });
+    }
+    players.sort((a, b) => b.value - a.value);
+    return { ownerId, displayName, players };
   });
 }
 

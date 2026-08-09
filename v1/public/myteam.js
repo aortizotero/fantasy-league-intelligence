@@ -44,6 +44,7 @@ function applyHighlight() {
 
   renderRivalries(ownerId);
   if (window.renderTradeTracker) window.renderTradeTracker(ownerId, myName);
+  if (window.setTradeAnalyzerOfferTeam) window.setTradeAnalyzerOfferTeam(ownerId, myName);
 }
 
 const MIN_RIVALRY_GAMES = 3; // enough head-to-head games for "nemesis"/"victim" to mean something

@@ -3,12 +3,16 @@ const statusEl = document.getElementById("status");
 const results = document.getElementById("results");
 const leagueIdInput = document.getElementById("league-id");
 const leagueIdError = document.getElementById("league-id-error");
+const leagueSubmit = document.getElementById("league-submit");
 
 let activeLeagueId = null;
+let turnstileToken = null; // set by onTurnstileSuccess (Cloudflare Turnstile, index.html) — sent as X-Turnstile-Token on the first request; the server's response cookie covers every later one in the session
 let allTrades = []; // full tradeTracker list from the last load — renderTradeTracker() filters/slices from this, no re-fetch needed
 const TRADE_TRACKER_LIMIT = 5;
 let currentPointsReport = null; // full positionPointsReport payload — scope toggle re-renders from this, no re-fetch needed
 let pointsReportScope = "starters"; // persists across scope changes within a session (not saved — resets on reload, unlike Mi equipo)
+let currentLeagueData = null; // full /api/league response from the last load — the season filter re-renders from this, no re-fetch needed
+let seasonFilterValue = null; // "all" or a season string; reset to the most recent season on every fresh load
 
 // Sleeper League IDs are numeric snowflake-style IDs (18-19 digits in
 // practice). This isn't a hard spec, just enough to catch "pasted the wrong
@@ -43,6 +47,23 @@ leagueIdInput.addEventListener("input", () => {
   leagueIdError.textContent = "";
 });
 
+// Cloudflare Turnstile callbacks — referenced by name from the
+// data-callback/data-expired-callback/data-error-callback attributes on the
+// .cf-turnstile div in index.html (implicit rendering). The submit button
+// starts disabled in the markup; it only becomes usable once a token exists.
+window.onTurnstileSuccess = function onTurnstileSuccess(token) {
+  turnstileToken = token;
+  leagueSubmit.disabled = false;
+};
+window.onTurnstileExpired = function onTurnstileExpired() {
+  turnstileToken = null;
+  leagueSubmit.disabled = true;
+};
+window.onTurnstileError = function onTurnstileError() {
+  turnstileToken = null;
+  leagueSubmit.disabled = true;
+};
+
 // Re-invoked by i18n.js after a language switch, if a league is already
 // loaded — narratives are generated server-side, so a language change
 // needs a re-fetch, not just a client-side string swap.
@@ -55,13 +76,16 @@ async function loadLeague(leagueId) {
   statusEl.textContent = t("loading");
 
   try {
-    const res = await fetch(`/api/league/${encodeURIComponent(leagueId)}?lang=${getLang()}`);
+    const res = await fetch(`/api/league/${encodeURIComponent(leagueId)}?lang=${getLang()}`, {
+      headers: { "X-Turnstile-Token": turnstileToken || "" },
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t("unknownError"));
 
     render(data);
     if (window.initCards) window.initCards(data);
     if (window.initMyTeam) window.initMyTeam(data, leagueId);
+    if (window.initTradeAnalyzer) window.initTradeAnalyzer(data, leagueId);
     statusEl.textContent = "";
     results.hidden = false;
     maybeShowCoachmark();
@@ -92,6 +116,7 @@ document.addEventListener("click", (e) => {
 });
 
 function render(data) {
+  currentLeagueData = data;
   document.getElementById("league-info").innerHTML = `
     <h2>${escapeHtml(data.league.name)}</h2>
     <p class="hint">${escapeHtml(t("seasonSummary", data.league.season, data.league.totalSeasons))}</p>
@@ -116,25 +141,8 @@ function render(data) {
   document.getElementById("current-standings").innerHTML = scrollWrap(standingsTable(data.currentStandings));
   document.getElementById("goat").innerHTML = goatCard(data.goat);
   document.getElementById("h2h").innerHTML = scrollWrap(h2hMatrix(data.h2h, data.goat));
-  document.getElementById("historical-standings").innerHTML = data.historicalStandings
-    .map((s, i) => ({ s, i }))
-    .reverse()
-    .map(
-      ({ s, i }) => `
-      <div class="season-header">
-        <h3>${escapeHtml(s.season)}</h3>
-        <div class="season-header-actions">
-          ${
-            data.champions[i]
-              ? `<button class="card-trigger-btn" data-card="champion" data-index="${i}" type="button">${t("champion")}</button>`
-              : ""
-          }
-          <button class="card-trigger-btn" data-card="season" data-index="${i}" type="button">${t("share")}</button>
-        </div>
-      </div>
-      ${scrollWrap(standingsTable(s.standings))}`
-    )
-    .join("");
+  populateSeasonFilter(data.historicalStandings);
+  renderSeasonScoped();
 
   document.getElementById("roster-depth").innerHTML = scrollWrap(rosterDepthTable(data.rosterDepth));
   document.getElementById("draft-picks").innerHTML = scrollWrap(draftPicksTable(data.draftPicks));
@@ -142,7 +150,6 @@ function render(data) {
   currentPointsReport = data.positionPointsReport;
   renderPointsReport();
 
-  toggleSection("trophy-case-section", "trophy-case", data.trophyCase, trophyCaseHtml);
   toggleSection("bracket-section", "playoff-bracket", data.playoffBracket, playoffBracketHtml);
   toggleSection("power-rankings-section", "power-rankings", data.powerRankings, powerRankingsTable, true);
   toggleSection("season-trend-section", "season-trend", data.seasonTrend, seasonTrendHtml);
@@ -182,6 +189,69 @@ function toggleSection(sectionId, contentId, dataValue, renderFn, wrapScroll, al
   section.hidden = false;
   const html = renderFn(dataValue);
   document.getElementById(contentId).innerHTML = wrapScroll ? scrollWrap(html) : html;
+}
+
+// Shared "Season" filter driving both Standings by Season and Trophy Case —
+// one control instead of two, since they're adjacent, per-season views of
+// the same season list. Rebuilds the option list on every load (seasons can
+// change), but keeps the current selection if it's still valid; otherwise
+// defaults to the most recent season, not "All" (mirrors "Standings —
+// Current Season" already defaulting to now).
+function populateSeasonFilter(historicalStandings) {
+  const seasons = historicalStandings.map((s) => s.season);
+  if (!seasonFilterValue || !seasons.includes(seasonFilterValue)) {
+    seasonFilterValue = seasons[seasons.length - 1];
+  }
+
+  const select = document.getElementById("season-filter");
+  const options = [...seasons].reverse().map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+  select.innerHTML = `<option value="all">${escapeHtml(t("seasonFilterAll"))}</option>${options}`;
+  select.value = seasonFilterValue;
+}
+
+document.getElementById("season-filter").addEventListener("change", (e) => {
+  seasonFilterValue = e.target.value;
+  renderSeasonScoped();
+});
+
+// Re-renders Standings by Season + Trophy Case from the already-loaded
+// currentLeagueData for the current seasonFilterValue — no re-fetch, same
+// pattern as the Trade Tracker team filter / Points Report scope toggle.
+function renderSeasonScoped() {
+  if (!currentLeagueData) return;
+  document.getElementById("historical-standings").innerHTML = historicalStandingsHtml(
+    currentLeagueData.historicalStandings,
+    currentLeagueData.champions,
+    seasonFilterValue
+  );
+  toggleSection("trophy-case-section", "trophy-case", currentLeagueData.trophyCase, (tc) => trophyCaseHtml(tc, seasonFilterValue));
+}
+
+// Filters *after* capturing each entry's true index — cards.js reads
+// currentData.historicalStandings[index] / currentData.champions[index] by
+// the original, unfiltered array position for the season/champion share
+// buttons, so reindexing after filtering would point them at the wrong season.
+function historicalStandingsHtml(historicalStandings, champions, filterSeason) {
+  return historicalStandings
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => filterSeason === "all" || s.season === filterSeason)
+    .reverse()
+    .map(
+      ({ s, i }) => `
+      <div class="season-header">
+        <h3>${escapeHtml(s.season)}</h3>
+        <div class="season-header-actions">
+          ${
+            champions[i]
+              ? `<button class="card-trigger-btn" data-card="champion" data-index="${i}" type="button">${t("champion")}</button>`
+              : ""
+          }
+          <button class="card-trigger-btn" data-card="season" data-index="${i}" type="button">${t("share")}</button>
+        </div>
+      </div>
+      ${scrollWrap(standingsTable(s.standings))}`
+    )
+    .join("");
 }
 
 // Results for the most recently played week, plus two callouts (biggest
@@ -364,13 +434,19 @@ function draftPicksTable(draftPicks) {
 
 // One square card per resolved season — same shell as everything else,
 // four small trophies per season instead of a table row.
-function trophyCaseHtml(trophyCase) {
+function trophyCaseHtml(trophyCase, filterSeason) {
   const slot = (label, entry, extra) =>
     entry
       ? `<div class="trophy-slot"><div class="trophy-label">${label}</div><div class="trophy-name">${escapeHtml(entry.displayName)}</div><div class="trophy-extra hint">${extra}</div></div>`
       : "";
 
-  return `<div class="narrative-grid">${trophyCase
+  // Not index-aligned with historicalStandings (unresolved seasons are
+  // skipped entirely), so a plain season-equality filter is enough — no
+  // index to preserve, unlike historicalStandingsHtml.
+  const filtered = !filterSeason || filterSeason === "all" ? trophyCase : trophyCase.filter((s) => s.season === filterSeason);
+  if (!filtered.length) return `<p class="hint">${t("trophyCaseEmptySeason")}</p>`;
+
+  return `<div class="narrative-grid">${filtered
     .map((season) => {
       const record = (s) => `${s.wins}-${s.losses}${s.ties ? `-${s.ties}` : ""}`;
       return `
@@ -402,7 +478,7 @@ function playoffBracketHtml(bracket) {
     .map(
       ([round, matches]) => `
     <div class="bracket-round">
-      <div class="bracket-round-label hint">${escapeHtml(t("bracketRound", round))}</div>
+      <div class="bracket-round-label">${escapeHtml(t("bracketRound", round))}</div>
       ${matches
         .map(
           (m) => `

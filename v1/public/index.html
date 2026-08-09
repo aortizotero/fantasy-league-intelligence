@@ -32,6 +32,9 @@
 </script>
 
 <link rel="stylesheet" href="style.css">
+<!-- Turnstile can't be self-hosted (it's a live bot-check against Cloudflare's
+     edge) — the one deliberate exception to this project's no-runtime-CDN rule. -->
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script>
   // Set the theme attribute before first paint so there's no flash of the
   // wrong theme — theme.js (loaded at the end of body) only handles the
@@ -67,8 +70,23 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <form id="league-form">
     <label for="league-id" class="sr-only" data-i18n="leagueIdLabel">Sleeper League ID</label>
     <input type="text" id="league-id" data-i18n-placeholder="leagueIdPlaceholder" placeholder="Sleeper League ID (e.g. 123456789012345678)" required>
-    <button type="submit" data-i18n="analyzeBtn">Analyze League</button>
+    <button type="submit" id="league-submit" disabled data-i18n="analyzeBtn">Analyze League</button>
   </form>
+  <div class="turnstile-wrap">
+    <!--
+      Cloudflare's published always-pass TEST site key — works out of the
+      box locally with zero Cloudflare setup, but provides no real
+      protection. Replace with your real Site Key from the Turnstile
+      dashboard before deploying (site keys are meant to be public, safe to
+      hardcode here — same tier as the GTM ID above). The matching secret
+      key goes server-side only, as the TURNSTILE_SECRET_KEY env var.
+    -->
+    <div class="cf-turnstile"
+         data-sitekey="0x4AAAAAAELXAq3vlaA6pO1L"
+         data-callback="onTurnstileSuccess"
+         data-expired-callback="onTurnstileExpired"
+         data-error-callback="onTurnstileError"></div>
+  </div>
   <p id="league-id-error" class="field-error"></p>
   <p class="hint form-help"><a href="https://support.sleeper.com/en/articles/4121798-how-do-i-find-my-league-id" target="_blank" rel="noopener noreferrer" data-i18n="findLeagueId">Where do I find my League ID?</a></p>
 
@@ -90,11 +108,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <main id="results" hidden>
     <section id="league-info"></section>
 
-    <section id="week-recap-section" hidden>
-      <h2 data-i18n="weekRecapTitle">📅 Week Recap</h2>
-      <div id="week-recap"></div>
-    </section>
-
     <section id="my-team-section">
       <label for="my-team-select" data-i18n="myTeamLabel">🎯 My Team</label>
       <select id="my-team-select">
@@ -103,15 +116,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <p class="hint" data-i18n="myTeamHint">Highlights your rows in standings, GOAT, and H2H, and flags the stories that mention you.</p>
     </section>
 
-    <section id="rivalry-section" hidden>
-      <h2 data-i18n="rivalryTitle">⚔️ Your Rivalries</h2>
-      <div id="rivalry-cards"></div>
-    </section>
+    <div class="section-group-header" data-i18n="groupRightNow">🟢 Right Now</div>
 
-    <section id="narratives-section">
-      <h2 data-i18n="narrativesTitle">📖 The Stories of Your League</h2>
-      <p class="hint" data-i18n="narrativesHint">What the numbers don't tell you at a glance.</p>
-      <div id="narratives"></div>
+    <section id="week-recap-section" hidden>
+      <h2 data-i18n="weekRecapTitle">📅 Week Recap</h2>
+      <div id="week-recap"></div>
     </section>
 
     <section>
@@ -119,36 +128,28 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div id="current-standings"></div>
     </section>
 
-    <section>
-      <h2 data-i18n="goatTitle">🐐 League GOAT</h2>
-      <p class="hint" data-i18n="goatHint">Historical ranking: championships first, win record as tiebreaker.</p>
-      <div id="coachmark" class="coachmark" hidden>
-        <span data-i18n="coachmarkText">Tap any row to turn it into a shareable card</span>
-        <button type="button" id="coachmark-dismiss" data-i18n-aria-label="coachmarkDismiss" aria-label="Dismiss">✕</button>
-      </div>
-      <div id="goat"></div>
-    </section>
-
-    <section>
-      <h2 data-i18n="h2hTitle">Head-to-Head</h2>
-      <p class="hint" data-i18n="h2hHint">Record between every pair of managers, across all seasons.</p>
-      <div id="h2h"></div>
-    </section>
-
-    <section>
-      <h2 data-i18n="historicalStandingsTitle">Standings by Season</h2>
-      <div id="historical-standings"></div>
-    </section>
-
-    <section id="trophy-case-section" hidden>
-      <h2 data-i18n="trophyCaseTitle">🏆 Trophy Case</h2>
-      <div id="trophy-case"></div>
-    </section>
-
     <section id="bracket-section" hidden>
       <h2 data-i18n="bracketTitle">🗂️ Playoff Bracket</h2>
       <p class="hint" data-i18n="bracketHint">Current season only.</p>
       <div id="playoff-bracket"></div>
+    </section>
+
+    <section id="power-rankings-section" hidden>
+      <h2 data-i18n="powerRankingsTitle">📊 Power Rankings</h2>
+      <p class="hint" data-i18n="powerRankingsHint">Blends record and points-for — not the same as the standings table. Movement since last week.</p>
+      <div id="power-rankings"></div>
+    </section>
+
+    <section id="season-trend-section" hidden>
+      <h2 data-i18n="seasonTrendTitle">📈 Season Trend</h2>
+      <p class="hint" data-i18n="seasonTrendHint">Points For by week, current season.</p>
+      <div id="season-trend"></div>
+    </section>
+
+    <section id="luck-index-section" hidden>
+      <h2 data-i18n="luckIndexTitle">🍀 Luck Index</h2>
+      <p class="hint" data-i18n="luckIndexHint">Expected record vs. actual, based on how you'd have done against every team's score each week — not just your real opponent.</p>
+      <div id="luck-index"></div>
     </section>
 
     <section>
@@ -175,27 +176,77 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div id="draft-picks"></div>
     </section>
 
-    <section id="power-rankings-section" hidden>
-      <h2 data-i18n="powerRankingsTitle">📊 Power Rankings</h2>
-      <p class="hint" data-i18n="powerRankingsHint">Blends record and points-for — not the same as the standings table. Movement since last week.</p>
-      <div id="power-rankings"></div>
+    <div class="section-group-header" data-i18n="groupHistory">🕰️ League History</div>
+
+    <section id="rivalry-section" hidden>
+      <h2 data-i18n="rivalryTitle">⚔️ Your Rivalries</h2>
+      <div id="rivalry-cards"></div>
     </section>
 
-    <section id="season-trend-section" hidden>
-      <h2 data-i18n="seasonTrendTitle">📈 Season Trend</h2>
-      <p class="hint" data-i18n="seasonTrendHint">Points For by week, current season.</p>
-      <div id="season-trend"></div>
+    <section id="narratives-section">
+      <h2 data-i18n="narrativesTitle">📖 The Stories of Your League</h2>
+      <p class="hint" data-i18n="narrativesHint">What the numbers don't tell you at a glance.</p>
+      <div id="narratives"></div>
     </section>
 
-    <section id="luck-index-section" hidden>
-      <h2 data-i18n="luckIndexTitle">🍀 Luck Index</h2>
-      <p class="hint" data-i18n="luckIndexHint">Expected record vs. actual, based on how you'd have done against every team's score each week — not just your real opponent.</p>
-      <div id="luck-index"></div>
+    <section>
+      <h2 data-i18n="goatTitle">🐐 League GOAT</h2>
+      <p class="hint" data-i18n="goatHint">Historical ranking: championships first, win record as tiebreaker.</p>
+      <div id="coachmark" class="coachmark" hidden>
+        <span data-i18n="coachmarkText">Tap any row to turn it into a shareable card</span>
+        <button type="button" id="coachmark-dismiss" data-i18n-aria-label="coachmarkDismiss" aria-label="Dismiss">✕</button>
+      </div>
+      <div id="goat"></div>
+    </section>
+
+    <section>
+      <h2 data-i18n="h2hTitle">Head-to-Head</h2>
+      <p class="hint" data-i18n="h2hHint">Record between every pair of managers, across all seasons.</p>
+      <div id="h2h"></div>
+    </section>
+
+    <div class="season-filter-bar">
+      <label for="season-filter" data-i18n="seasonFilterLabel">Season</label>
+      <select id="season-filter"></select>
+    </div>
+
+    <section>
+      <h2 data-i18n="historicalStandingsTitle">Standings by Season</h2>
+      <div id="historical-standings"></div>
+    </section>
+
+    <section id="trophy-case-section" hidden>
+      <h2 data-i18n="trophyCaseTitle">🏆 Trophy Case</h2>
+      <div id="trophy-case"></div>
     </section>
 
     <section id="trade-tracker-section" hidden>
       <h2 data-i18n="tradeTrackerTitle">🔄 Trade Tracker</h2>
       <div id="trade-tracker"></div>
+    </section>
+
+    <div class="section-group-header" data-i18n="groupAnalyze">🔮 Analyze &amp; Plan</div>
+
+    <section id="trade-analyzer-section" hidden>
+      <h2 data-i18n="tradeAnalyzerTitle">🧮 Trade Analyzer</h2>
+      <p class="hint" data-i18n="tradeAnalyzerHint">Pick players to offer and players to request, then get an AI verdict on who wins the trade.</p>
+      <div class="ta-grid">
+        <div class="ta-side">
+          <label class="sr-only" for="ta-offer-select" data-i18n="tradeAnalyzerYourTeam">Your team</label>
+          <select id="ta-offer-select"></select>
+          <div id="ta-offer-players" class="player-checklist" role="status" aria-live="polite"></div>
+        </div>
+        <div class="ta-side">
+          <label class="sr-only" for="ta-request-select" data-i18n="tradeAnalyzerTheirTeam">Their team</label>
+          <select id="ta-request-select"></select>
+          <div id="ta-request-players" class="player-checklist" role="status" aria-live="polite"></div>
+        </div>
+      </div>
+      <div id="ta-totals" class="ta-totals" hidden></div>
+      <div class="ta-actions">
+        <button id="ta-analyze-btn" class="ta-analyze-btn" type="button" disabled data-i18n="tradeAnalyzerBtn">🤖 Analyze Trade with AI</button>
+      </div>
+      <div id="ta-result" class="ai-result" hidden></div>
     </section>
   </main>
 
@@ -218,6 +269,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <script src="vendor/html-to-image.js"></script>
   <script src="cards.js"></script>
   <script src="myteam.js"></script>
+  <script src="tradeAnalyzer.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
