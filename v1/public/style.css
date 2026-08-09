@@ -5,12 +5,18 @@
   --text: #e8eaed;
   --muted: #8a8f98;
   --accent: #00c46a;
+  /* Text-safe variant of --accent. --accent itself is only guaranteed 3:1
+     (large text / UI components) — fine for button fills and borders, not
+     enough for small colored text (WCAG 1.4.3 needs 4.5:1 there). Same
+     value as --accent in dark mode (already 8.19:1+), overridden darker in
+     light mode below where plain --accent text drops to ~3.2:1. */
+  --accent-text: #00c46a;
   --accent-contrast: #05130b;
   --error: #e5484d;
   /* Desaturated, distinct from --error — Power Rankings "down" arrow is the
      only OTHER place non-accent color is allowed, and it must never be
      confused with the form-validation error state. */
-  --negative: #a35c5e;
+  --negative: #c77477;
   --radius-control: 8px;
   --radius-card: 12px;
   --radius-pill: 20px;
@@ -19,7 +25,11 @@
 /* Light Mode — for daytime shares. Darkened accent (#00a05a vs #00c46a)
    keeps contrast on a white surface; same radii/spacing/shell, only
    surfaces and text invert. Defaults to the OS preference, overridable by
-   the toggle (persisted in localStorage, same pattern as the lang toggle). */
+   the toggle (persisted in localStorage, same pattern as the lang toggle).
+   --accent-text/--error/--negative are overridden separately from their
+   dark-mode values (rather than just inheriting) because a fixed hex that
+   passes 4.5:1 on a dark surface fails badly on a light one, and vice versa
+   — same token, opposite direction per theme. */
 :root[data-theme="light"] {
   --bg: #f7f8fa;
   --card: #ffffff;
@@ -27,6 +37,9 @@
   --text: #1a1d24;
   --muted: #6b7280;
   --accent: #00a05a;
+  --accent-text: #00753f;
+  --error: #c13136;
+  --negative: #8a4c4e;
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
@@ -36,10 +49,28 @@
     --text: #1a1d24;
     --muted: #6b7280;
     --accent: #00a05a;
+    --accent-text: #00753f;
+    --error: #c13136;
+    --negative: #8a4c4e;
   }
 }
 
 * { box-sizing: border-box; }
+
+/* Visually hidden but readable by screen readers — for labels that already
+   have a self-explanatory placeholder/icon on screen and don't need a
+   second visible copy, but still need a real programmatic label. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
@@ -99,7 +130,11 @@ h1 { margin: 0 0 8px; font-size: 34px; font-weight: 800; }
 #league-id:focus-visible,
 #my-team-select:focus-visible,
 button:focus-visible,
-.card-trigger-btn:focus-visible {
+.card-trigger-btn:focus-visible,
+.card-trigger-row:focus-visible,
+.card-trigger-cell:focus-visible,
+select:focus-visible,
+a:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(0, 196, 106, 0.25);
 }
@@ -116,7 +151,7 @@ button {
 button:hover { opacity: 0.9; }
 
 .form-help { text-align: center; margin-top: 0; }
-.form-help a { color: var(--accent); text-decoration: none; }
+.form-help a { color: var(--accent-text); text-decoration: none; }
 .form-help a:hover { text-decoration: underline; }
 
 #status { text-align: center; color: var(--muted); min-height: 20px; }
@@ -143,7 +178,7 @@ section h2 { margin-top: 0; }
 }
 #about-section li::before {
   content: "✓";
-  color: var(--accent);
+  color: var(--accent-text);
   position: absolute;
   left: 0;
   font-weight: 700;
@@ -182,7 +217,7 @@ table.matrix .row-label { text-align: left; color: var(--text); text-transform: 
 table.matrix td.diag { color: var(--border); }
 
 /* Highest count in a roster-depth column / positive net draft picks. */
-td.depth-max { color: var(--accent); font-weight: 700; }
+td.depth-max { color: var(--accent-text); font-weight: 700; }
 
 /* ---- Week recap ------------------------------------------------------ */
 .week-callout {
@@ -212,7 +247,7 @@ td.depth-max { color: var(--accent); font-weight: 700; }
 .matchup-row:last-child { border-bottom: none; }
 .matchup-team { flex: 1; }
 .matchup-team:last-child { text-align: right; }
-.matchup-team.won { color: var(--accent); }
+.matchup-team.won { color: var(--accent-text); }
 .matchup-team.is-me { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
 .matchup-vs { color: var(--muted); font-size: 11px; text-transform: uppercase; flex: 0; }
 
@@ -236,7 +271,7 @@ td.depth-max { color: var(--accent); font-weight: 700; }
 }
 .narrative-icon { font-size: 28px; margin-bottom: 6px; }
 .narrative-title {
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -251,7 +286,7 @@ td.depth-max { color: var(--accent); font-weight: 700; }
    data point. */
 .card-trigger-row, .card-trigger-cell { cursor: pointer; }
 .card-trigger-row:hover { background: rgba(0, 196, 106, 0.14); }
-td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--accent); }
+td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--accent-text); }
 .card-hint-tap { text-align: center; margin: 0 0 12px; }
 
 /* Onboarding coachmark — the ONE place a solid (not tinted) accent fill is
@@ -303,7 +338,7 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
   color: var(--text);
   font-weight: 500;
 }
-.card-trigger-btn:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
+.card-trigger-btn:hover { border-color: var(--accent); color: var(--accent-text); opacity: 1; }
 .narrative-card { position: relative; }
 .narrative-card .card-trigger-btn { margin-top: 12px; }
 
@@ -472,14 +507,14 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
 }
 .pp-cell { display: flex; flex-direction: column; align-items: center; gap: 1px; }
 .pp-actual { font-weight: 700; }
-.pp-actual.power-up { color: var(--accent); }
+.pp-actual.power-up { color: var(--accent-text); }
 .pp-actual.power-down { color: var(--negative); }
 .pp-projected { font-size: 11px; color: var(--muted); }
 
 /* Applied to any [data-owner-id] row/cell matching the selected manager. */
 tr.is-me { background: rgba(0, 196, 106, 0.14); }
 tr.is-me td:first-child, tr.is-me th.row-label { box-shadow: inset 3px 0 0 var(--accent); }
-th.is-me { color: var(--accent); }
+th.is-me { color: var(--accent-text); }
 .goat-hero.is-me { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 
 .narrative-card.mentions-me {
@@ -506,13 +541,13 @@ th.is-me { color: var(--accent); }
 }
 .bracket-team { padding: 8px 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
 .bracket-team:last-child { border-bottom: none; }
-.bracket-team.won { background: rgba(0, 196, 106, 0.12); color: var(--accent); font-weight: 700; }
+.bracket-team.won { background: rgba(0, 196, 106, 0.12); color: var(--accent-text); font-weight: 700; }
 
 /* ---- Power Rankings ----------------------------------------------------
    Movement arrows: accent up, muted dash flat, desaturated red down — the
    only other place a non-accent color is used, and it never means "loss"
    anywhere else in the app. */
-.power-up { color: var(--accent); font-weight: 700; }
+.power-up { color: var(--accent-text); font-weight: 700; }
 .power-down { color: var(--negative); font-weight: 700; }
 .power-flat { color: var(--muted); }
 
@@ -542,7 +577,7 @@ th.is-me { color: var(--accent); }
   background: transparent;
   color: var(--muted);
 }
-.ai-analyze-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); opacity: 1; }
+.ai-analyze-btn:hover:not(:disabled) { color: var(--accent-text); border-color: var(--accent); opacity: 1; }
 .ai-analyze-btn:disabled { cursor: default; opacity: 0.6; }
 .ai-result {
   margin-top: 8px;

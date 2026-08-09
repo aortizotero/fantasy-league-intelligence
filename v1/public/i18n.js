@@ -7,6 +7,7 @@
 const STRINGS = {
   en: {
     subtitle: "Standings, head-to-head history, and your league's GOAT — just enter your Sleeper League ID.",
+    leagueIdLabel: "Sleeper League ID",
     leagueIdPlaceholder: "Sleeper League ID (e.g. 123456789012345678)",
     analyzeBtn: "Analyze League",
     findLeagueId: "Where do I find my League ID?",
@@ -96,6 +97,7 @@ const STRINGS = {
     noMoves: "No moves",
 
     modalClose: "Close",
+    modalTitle: "Shareable card",
     modalDownload: "⬇️ Download",
     modalShare: "📤 Share",
     generatingImage: "Generating image...",
@@ -156,6 +158,7 @@ const STRINGS = {
 
   es: {
     subtitle: "Standings, historial de enfrentamientos, y el GOAT de tu liga — solo pon tu League ID de Sleeper.",
+    leagueIdLabel: "League ID de Sleeper",
     leagueIdPlaceholder: "League ID de Sleeper (ej. 123456789012345678)",
     analyzeBtn: "Analizar liga",
     findLeagueId: "¿Dónde encuentro mi League ID?",
@@ -245,6 +248,7 @@ const STRINGS = {
     noMoves: "Sin movimientos",
 
     modalClose: "Cerrar",
+    modalTitle: "Card compartible",
     modalDownload: "⬇️ Descargar",
     modalShare: "📤 Compartir",
     generatingImage: "Generando imagen...",
@@ -338,7 +342,9 @@ function applyStaticTranslations() {
 
 function updateToggleButtons() {
   document.querySelectorAll("[data-lang-btn]").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.langBtn === currentLang);
+    const isActive = btn.dataset.langBtn === currentLang;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-pressed", String(isActive));
   });
 }
 

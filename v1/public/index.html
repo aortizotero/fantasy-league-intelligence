@@ -65,13 +65,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </header>
 
   <form id="league-form">
+    <label for="league-id" class="sr-only" data-i18n="leagueIdLabel">Sleeper League ID</label>
     <input type="text" id="league-id" data-i18n-placeholder="leagueIdPlaceholder" placeholder="Sleeper League ID (e.g. 123456789012345678)" required>
     <button type="submit" data-i18n="analyzeBtn">Analyze League</button>
   </form>
   <p id="league-id-error" class="field-error"></p>
   <p class="hint form-help"><a href="https://support.sleeper.com/en/articles/4121798-how-do-i-find-my-league-id" target="_blank" rel="noopener noreferrer" data-i18n="findLeagueId">Where do I find my League ID?</a></p>
 
-  <p id="status"></p>
+  <p id="status" role="status"></p>
 
   <section id="about-section">
     <h2 data-i18n="aboutTitle">What Story of My League tracks</h2>
@@ -198,7 +199,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </section>
   </main>
 
-  <div id="card-modal" class="card-modal" hidden>
+  <div id="card-modal" class="card-modal" role="dialog" aria-modal="true" data-i18n-aria-label="modalTitle" aria-label="Shareable card" hidden>
     <div class="card-modal-inner">
       <button id="card-close" class="card-close" data-i18n-aria-label="modalClose" aria-label="Close" type="button">✕</button>
       <div class="card-canvas-wrap">

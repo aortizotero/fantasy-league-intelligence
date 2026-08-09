@@ -22,10 +22,14 @@ form.addEventListener("submit", (e) => {
 
   if (!LEAGUE_ID_PATTERN.test(leagueId)) {
     leagueIdInput.classList.add("invalid");
+    leagueIdInput.setAttribute("aria-invalid", "true");
+    leagueIdInput.setAttribute("aria-describedby", "league-id-error");
     leagueIdError.textContent = t("invalidLeagueId");
     return;
   }
   leagueIdInput.classList.remove("invalid");
+  leagueIdInput.removeAttribute("aria-invalid");
+  leagueIdInput.removeAttribute("aria-describedby");
   leagueIdError.textContent = "";
 
   activeLeagueId = leagueId;
@@ -34,6 +38,8 @@ form.addEventListener("submit", (e) => {
 
 leagueIdInput.addEventListener("input", () => {
   leagueIdInput.classList.remove("invalid");
+  leagueIdInput.removeAttribute("aria-invalid");
+  leagueIdInput.removeAttribute("aria-describedby");
   leagueIdError.textContent = "";
 });
 
@@ -244,11 +250,11 @@ function rosterDepthTable(rosterDepth) {
         const isMax = count > 0 && count === maxByPosition[pos];
         return `<td class="${isMax ? "depth-max" : ""}">${count}</td>`;
       }).join("");
-      return `<tr data-owner-id="${escapeHtml(r.ownerId)}"><td class="row-label">${escapeHtml(r.displayName)}</td>${cells}<td>${r.total}</td></tr>`;
+      return `<tr data-owner-id="${escapeHtml(r.ownerId)}"><th scope="row" class="row-label">${escapeHtml(r.displayName)}</th>${cells}<td>${r.total}</td></tr>`;
     })
     .join("");
 
-  const header = `<th></th>${POSITION_COLUMNS.map((p) => `<th>${p}</th>`).join("")}<th>${t("colTotal")}</th>`;
+  const header = `<th></th>${POSITION_COLUMNS.map((p) => `<th scope="col">${p}</th>`).join("")}<th scope="col">${t("colTotal")}</th>`;
   return `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -270,11 +276,11 @@ function rosterValueTable(rosterValue) {
         const isMax = value > 0 && value === maxByPosition[pos];
         return `<td class="${isMax ? "depth-max" : ""}">${value.toLocaleString()}</td>`;
       }).join("");
-      return `<tr data-owner-id="${escapeHtml(r.ownerId)}"><td class="row-label">${escapeHtml(r.displayName)}</td>${cells}<td>${r.total.toLocaleString()}</td></tr>`;
+      return `<tr data-owner-id="${escapeHtml(r.ownerId)}"><th scope="row" class="row-label">${escapeHtml(r.displayName)}</th>${cells}<td>${r.total.toLocaleString()}</td></tr>`;
     })
     .join("");
 
-  const header = `<th></th>${VALUE_POSITION_COLUMNS.map((p) => `<th>${p}</th>`).join("")}<th>${t("colTotal")}</th>`;
+  const header = `<th></th>${VALUE_POSITION_COLUMNS.map((p) => `<th scope="col">${p}</th>`).join("")}<th scope="col">${t("colTotal")}</th>`;
   return `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -323,11 +329,11 @@ function pointsReportTable(teams, scope) {
     .sort((a, b) => (b.total.actual - b.total.projected) - (a.total.actual - a.total.projected))
     .map((team) => {
       const cells = POSITION_COLUMNS.map((pos) => pointsReportCell(team.byPosition[pos].actual, team.byPosition[pos].projected)).join("");
-      return `<tr data-owner-id="${escapeHtml(team.ownerId)}"><td class="row-label">${escapeHtml(team.displayName)}</td>${cells}${pointsReportCell(team.total.actual, team.total.projected)}</tr>`;
+      return `<tr data-owner-id="${escapeHtml(team.ownerId)}"><th scope="row" class="row-label">${escapeHtml(team.displayName)}</th>${cells}${pointsReportCell(team.total.actual, team.total.projected)}</tr>`;
     })
     .join("");
 
-  const header = `<th></th>${POSITION_COLUMNS.map((p) => `<th>${p}</th>`).join("")}<th>${t("colTotal")}</th>`;
+  const header = `<th></th>${POSITION_COLUMNS.map((p) => `<th scope="col">${p}</th>`).join("")}<th scope="col">${t("colTotal")}</th>`;
   return `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -353,7 +359,7 @@ function draftPicksTable(draftPicks) {
     </tr>`;
     })
     .join("");
-  return `<table><thead><tr><th>${t("colManagerHeader")}</th><th>${t("colNetPicks")}</th><th>${t("colDetail")}</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<table><thead><tr><th scope="col">${t("colManagerHeader")}</th><th scope="col">${t("colNetPicks")}</th><th scope="col">${t("colDetail")}</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // One square card per resolved season — same shell as everything else,
@@ -427,7 +433,7 @@ function powerRankingsTable(rankings) {
     </tr>`;
     })
     .join("");
-  return `<table><thead><tr><th>${t("colNum")}</th><th>${t("colManager")}</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<table><thead><tr><th scope="col">${t("colNum")}</th><th scope="col">${t("colManager")}</th><th scope="col"></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // One row per manager, small inline SVG sparkline (no axes/gridlines, per
@@ -574,7 +580,7 @@ function standingsTable(standings) {
     </tr>`
     )
     .join("");
-  return `<table><thead><tr><th>${t("colNum")}</th><th>${t("colManager")}</th><th>${t("colRecord")}</th><th>${t("colPF")}</th><th>${t("colPA")}</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<table><thead><tr><th scope="col">${t("colNum")}</th><th scope="col">${t("colManager")}</th><th scope="col">${t("colRecord")}</th><th scope="col">${t("colPF")}</th><th scope="col">${t("colPA")}</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // Story cards, not a table — these are meant to be read, not scanned.
@@ -603,7 +609,7 @@ function goatCard(goat) {
   const restRows = rest
     .map(
       (g, i) => `
-    <tr class="card-trigger-row" data-card="goat" data-index="${i + 1}" data-owner-id="${escapeHtml(g.ownerId)}" title="${escapeHtml(t("shareGoatRanking", g.displayName))}">
+    <tr class="card-trigger-row" data-card="goat" data-index="${i + 1}" data-owner-id="${escapeHtml(g.ownerId)}" title="${escapeHtml(t("shareGoatRanking", g.displayName))}" role="button" tabindex="0" aria-label="${escapeHtml(t("shareGoatRanking", g.displayName))}">
       <td>${i + 2}</td>
       <td>${escapeHtml(g.displayName)}</td>
       <td>${g.championships > 0 ? "🏆".repeat(g.championships) : "—"}</td>
@@ -615,7 +621,7 @@ function goatCard(goat) {
     .join("");
 
   return `
-    <div class="goat-hero card-trigger-row" data-card="goat" data-index="0" data-owner-id="${escapeHtml(champion.ownerId)}" title="${escapeHtml(t("shareGoat"))}">
+    <div class="goat-hero card-trigger-row" data-card="goat" data-index="0" data-owner-id="${escapeHtml(champion.ownerId)}" title="${escapeHtml(t("shareGoat"))}" role="button" tabindex="0" aria-label="${escapeHtml(t("shareGoat"))}">
       <div class="goat-hero-emoji">🐐</div>
       <div>
         <div class="goat-hero-name">${escapeHtml(champion.displayName)}</div>
@@ -624,7 +630,7 @@ function goatCard(goat) {
       </div>
     </div>
     <p class="hint card-hint-tap">${t("tapRowHint")}</p>
-    ${rest.length ? scrollWrap(`<table><thead><tr><th>${t("colNum")}</th><th>${t("colManager")}</th><th>${t("colChampionships")}</th><th>${t("colHistoricalRecord")}</th><th>${t("colWinPct")}</th><th>${t("colSeasons")}</th></tr></thead><tbody>${restRows}</tbody></table>`) : ""}
+    ${rest.length ? scrollWrap(`<table><thead><tr><th scope="col">${t("colNum")}</th><th scope="col">${t("colManager")}</th><th scope="col">${t("colChampionships")}</th><th scope="col">${t("colHistoricalRecord")}</th><th scope="col">${t("colWinPct")}</th><th scope="col">${t("colSeasons")}</th></tr></thead><tbody>${restRows}</tbody></table>`) : ""}
   `;
 }
 
@@ -641,7 +647,7 @@ function h2hMatrix(h2h, goat) {
   }
 
   const abbrevById = uniqueAbbreviations(managers);
-  const header = `<th></th>${managers.map((m) => `<th data-owner-id="${escapeHtml(m.ownerId)}" title="${escapeHtml(m.displayName)}">${escapeHtml(abbrevById.get(m.ownerId))}</th>`).join("")}`;
+  const header = `<th></th>${managers.map((m) => `<th scope="col" data-owner-id="${escapeHtml(m.ownerId)}" title="${escapeHtml(m.displayName)}">${escapeHtml(abbrevById.get(m.ownerId))}</th>`).join("")}`;
   const rows = managers
     .map((rowMgr) => {
       const cells = managers
@@ -649,10 +655,10 @@ function h2hMatrix(h2h, goat) {
           if (rowMgr.ownerId === colMgr.ownerId) return `<td class="diag">—</td>`;
           const record = lookup.get(`${rowMgr.ownerId}::${colMgr.ownerId}`);
           if (!record) return `<td>—</td>`;
-          return `<td class="card-trigger-cell" data-card="h2h" data-a-name="${escapeHtml(rowMgr.displayName)}" data-b-name="${escapeHtml(colMgr.displayName)}" data-record="${escapeHtml(record)}" title="${escapeHtml(t("shareH2H"))}">${record}</td>`;
+          return `<td class="card-trigger-cell" data-card="h2h" data-a-name="${escapeHtml(rowMgr.displayName)}" data-b-name="${escapeHtml(colMgr.displayName)}" data-record="${escapeHtml(record)}" title="${escapeHtml(t("shareH2H"))}" role="button" tabindex="0" aria-label="${escapeHtml(t("shareH2H"))}">${record}</td>`;
         })
         .join("");
-      return `<tr data-owner-id="${escapeHtml(rowMgr.ownerId)}"><th class="row-label">${escapeHtml(rowMgr.displayName)}</th>${cells}</tr>`;
+      return `<tr data-owner-id="${escapeHtml(rowMgr.ownerId)}"><th scope="row" class="row-label">${escapeHtml(rowMgr.displayName)}</th>${cells}</tr>`;
     })
     .join("");
 

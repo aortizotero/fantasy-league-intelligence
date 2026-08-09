@@ -4,6 +4,7 @@
 // desktop browsers that don't support sharing files).
 
 let currentData = null;
+let modalTrigger = null; // element that opened the modal, so focus can return to it on close
 
 const modal = document.getElementById("card-modal");
 const canvas = document.getElementById("card-canvas");
@@ -21,10 +22,27 @@ window.initCards = function initCards(data) {
 document.addEventListener("click", (e) => {
   const trigger = e.target.closest("[data-card]");
   if (!trigger || !currentData) return;
+  activateTrigger(trigger);
+});
+
+// GOAT rows/hero and H2H cells are <tr>/<div>/<td> with role="button" +
+// tabindex="0" (not real <button>s), so they need Enter/Space wired up by
+// hand. Real <button data-card>s (narrative/season/week/trade-AI) already
+// fire a native click on Enter/Space — skip those here or they'd double-fire.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const trigger = e.target.closest("[data-card]");
+  if (!trigger || trigger.tagName === "BUTTON" || !currentData) return;
+  e.preventDefault(); // Space would otherwise scroll the page
+  activateTrigger(trigger);
+});
+
+function activateTrigger(trigger) {
   const html = buildCardHtml(trigger.dataset);
   if (!html) return;
+  modalTrigger = trigger;
   openModal(html);
-});
+}
 
 closeBtn.addEventListener("click", closeModal);
 modal.addEventListener("click", (e) => {
@@ -35,12 +53,40 @@ function openModal(html) {
   canvas.innerHTML = html;
   hintEl.textContent = "";
   modal.hidden = false;
+  closeBtn.focus();
 }
 
 function closeModal() {
   modal.hidden = true;
   canvas.innerHTML = "";
+  if (modalTrigger) {
+    modalTrigger.focus();
+    modalTrigger = null;
+  }
 }
+
+// Escape closes the modal; Tab/Shift+Tab wrap within it instead of leaking
+// focus into the page behind — this is the only modal in the app, so a
+// single document-level listener (gated on modal.hidden) covers it.
+document.addEventListener("keydown", (e) => {
+  if (modal.hidden) return;
+  if (e.key === "Escape") {
+    closeModal();
+    return;
+  }
+  if (e.key !== "Tab") return;
+  const focusables = modal.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])');
+  if (!focusables.length) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+});
 
 function buildCardHtml(ds) {
   const leagueName = currentData.league.name;
