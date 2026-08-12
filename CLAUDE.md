@@ -185,6 +185,14 @@ Con esto, v3 tiene tres piezas nuevas fuera del roadmap original de "solo Claude
 
 **Entorno de desarrollo local reparado** — el `node_modules` del proyecto y la instalación global de npm de la máquina de Alex estaban corruptos (paquetes internos de npm — `glob`, `path-scurry` — con builds incompletos, aparentemente de una actualización interrumpida). Reparado reponiendo los builds faltantes / reapuntando `require` al build ESM vía el soporte nativo de `require(esm)` de Node 25, y reinstalando `v1/node_modules` limpio. No relacionado con el código del proyecto — documentado aquí solo porque bloqueaba correr `node server.js` localmente para probar cualquier cambio.
 
+## Backlog
+
+Ideas pendientes, todavía sin construir — capturadas 2026-08-12:
+
+- **Indicador de "hay que hacer scroll"**: al cargar los datos de la liga no es obvio que hay que scrollear hacia abajo para ver el contenido — no se siente intuitivo. Falta alguna señal visual (flecha, hint animado, lo que sea) justo después de cargar.
+- **Nueva sección "¿Quién ganó este trade?"**: análisis de IA de trades reales (ya sucedidos), pero con un selector propio para elegir *cualquier* trade de *cualquier* año de la historia de la liga — no limitado a los que aparecen en las últimas 5 del Transaction History. Distinto del Trade Analyzer (que es para trades hipotéticos que nunca pasaron) y del botón "🤖 Analizar con IA" que ya vive en cada fila de trade del Transaction History (pero ese solo cubre lo que el feed trae cargado).
+- **"Roast My Team"**: nueva sección que evalúa el estado actual del roster de un manager — usando ADP de sus jugadores y sus draft picks — y da una evaluación (el "roast"), más sugerencias concretas de qué podría hacer para mejorar el equipo.
+
 ## Notas
 
 _Este archivo se debe actualizar a mano con decisiones y contexto duradero del proyecto. El progreso sesión a sesión se guarda automáticamente en el sistema de memoria de Claude Code cuando la sesión se abre con esta carpeta como directorio de trabajo._
