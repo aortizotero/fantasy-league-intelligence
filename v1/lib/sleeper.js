@@ -155,6 +155,29 @@ function getTransactionsCached(leagueId, week) {
   return promise;
 }
 
+// Shared by computeDraftNarratives (steal/bust) and collectDraftPickEvents
+// (full pick log for Transaction History) — a request that needs both
+// (every request does, both run off computeNarratives/computeTransactionHistory)
+// only pays for the draft + picks fetch once per league.
+const draftCache = new Map(); // league_id -> Promise<draft|null>
+const draftPicksCache = new Map(); // draft_id -> Promise<picks|null>
+
+function getCompleteDraftCached(leagueId) {
+  if (draftCache.has(leagueId)) return draftCache.get(leagueId);
+  const promise = getDrafts(leagueId)
+    .then((drafts) => drafts?.[0] ?? null)
+    .catch(() => null);
+  draftCache.set(leagueId, promise);
+  return promise;
+}
+
+function getDraftPicksCached(draftId) {
+  if (draftPicksCache.has(draftId)) return draftPicksCache.get(draftId);
+  const promise = getDraftPicks(draftId).catch(() => null);
+  draftPicksCache.set(draftId, promise);
+  return promise;
+}
+
 // Standings for a single season, straight from Sleeper's own roster.settings
 // (wins/losses/ties/points are tracked server-side, no need to recompute).
 export async function getSeasonStandings(league) {
@@ -1073,21 +1096,10 @@ async function computeDraftNarratives(chain, playersMap, lang) {
   let worstBust = null;
 
   for (const league of chain) {
-    let draft;
-    try {
-      const drafts = await getDrafts(league.league_id);
-      draft = drafts?.[0];
-    } catch {
-      continue;
-    }
+    const draft = await getCompleteDraftCached(league.league_id);
     if (!draft || draft.status !== "complete") continue; // in-progress / no draft on record
 
-    let picks;
-    try {
-      picks = await getDraftPicks(draft.draft_id);
-    } catch {
-      continue;
-    }
+    const picks = await getDraftPicksCached(draft.draft_id);
     const validPicks = (picks || []).filter((p) => p.player_id && p.roster_id != null);
     if (validPicks.length < 10) continue; // too few picks to rank meaningfully
 
@@ -1185,9 +1197,10 @@ const MIN_TRADE_VALUE_GAP = 30; // points — filters out roughly-even trades, f
 // Every straightforward 2-team, players-only completed trade across the
 // chain, each side's post-trade production already computed. No gap
 // filtering here — that's specific to "is this worth telling as a
-// narrative", not to whether a trade counts for a full trade log. Shared by
-// computeTradeNarratives (single most lopsided) and computeTradeTracker
-// (the full list), so the per-week transaction fetch only happens once.
+// narrative", not to whether a trade counts for the transaction log. Shared
+// by computeTradeNarratives (single most lopsided) and
+// computeTransactionHistory (the full multi-type feed), so the per-week
+// transaction fetch only happens once.
 async function collectTrades(chain) {
   const trades = []; // { season, week, winner: {owner, players, value}, loser: {...}, gap }
 
@@ -1243,6 +1256,7 @@ async function collectTrades(chain) {
         trades.push({
           season: league.season,
           week,
+          timestamp: t.created,
           gap,
           winner: { owner: winnerIsA ? ownerA : ownerB, players: winnerIsA ? playersA : playersB, value: winnerIsA ? valueA : valueB },
           loser: { owner: winnerIsA ? ownerB : ownerA, players: winnerIsA ? playersB : playersA, value: winnerIsA ? valueB : valueA },
@@ -1254,21 +1268,134 @@ async function collectTrades(chain) {
   return trades;
 }
 
-// Full trade log for the Trade Tracker section — every trade found, most
-// recent first, with player names resolved for display.
-export async function computeTradeTracker(chain, playersMap) {
-  const trades = await collectTrades(chain);
-  const playerName = (id) => playersMap.get(id)?.name || `Player ${id}`;
+// Every completed waiver-claim or free-agent add/drop across the chain, one
+// entry per Sleeper transaction — a single transaction can add AND drop in
+// the same move (e.g. a waiver claim that displaces a bench player), so
+// this doesn't split them into two events. Reuses the same per-week
+// transaction fetch as collectTrades (already cached by getTransactionsCached,
+// so reading the other two transaction types here costs no extra network
+// calls), and skips the weekly-points pass entirely — a waiver move doesn't
+// need a "value produced" number the way a traded player does.
+async function collectWaiverMoves(chain) {
+  const moves = []; // { waiverType, season, week, timestamp, owner, added: playerId[], dropped: playerId[] }
+
+  for (const league of chain) {
+    const rosterMap = await buildRosterMap(league);
+    const lastWeek = (league.settings?.playoff_week_start || 15) - 1;
+    const weeks = Array.from({ length: Math.max(lastWeek, 0) }, (_, i) => i + 1);
+    const weeklyTransactions = await Promise.all(weeks.map((week) => getTransactionsCached(league.league_id, week)));
+
+    weeklyTransactions.forEach((transactions, weekIdx) => {
+      if (!transactions) return;
+      const week = weekIdx + 1;
+
+      for (const t of transactions) {
+        if (t.type !== "waiver" && t.type !== "free_agent") continue;
+        if (t.status !== "complete") continue;
+
+        const rosterId = t.roster_ids?.[0];
+        const owner = rosterId != null ? rosterMap.get(rosterId) : null;
+        if (!owner) continue;
+
+        const added = Object.keys(t.adds || {});
+        const dropped = Object.keys(t.drops || {});
+        if (!added.length && !dropped.length) continue; // e.g. a failed claim with nothing to show
+
+        moves.push({ waiverType: t.type, season: league.season, week, timestamp: t.created, owner, added, dropped });
+      }
+    });
+  }
+
+  return moves;
+}
+
+// Every individual draft pick across the chain as its own event. Sleeper's
+// picks endpoint has no per-pick timestamp (a draft is one sitting), so
+// every pick from the same draft shares the draft's own `last_picked` time
+// and sorts against each other by pick_no — see the tiebreak in
+// computeTransactionHistory below, which is why this carries `pickNo`
+// alongside `timestamp` rather than trying to fabricate a distinct time
+// per pick.
+async function collectDraftPickEvents(chain) {
+  const events = []; // { season, timestamp, pickNo, round, playerId, owner }
+
+  for (const league of chain) {
+    const draft = await getCompleteDraftCached(league.league_id);
+    if (!draft || draft.status !== "complete") continue;
+
+    const picks = await getDraftPicksCached(draft.draft_id);
+    const validPicks = (picks || []).filter((p) => p.player_id && p.roster_id != null);
+    if (!validPicks.length) continue;
+
+    const rosterMap = await buildRosterMap(league);
+    // Fallback timestamp only matters if Sleeper ever omits both fields —
+    // last_picked/start_time are present on every complete draft in
+    // practice, this just keeps sorting from throwing on NaN.
+    const timestamp = draft.last_picked || draft.start_time || 0;
+
+    for (const p of validPicks) {
+      const owner = rosterMap.get(p.roster_id);
+      if (!owner) continue;
+      events.push({ season: league.season, timestamp, pickNo: p.pick_no, round: p.round, playerId: p.player_id, owner });
+    }
+  }
+
+  return events;
+}
+
+// Full transaction log for the Transaction History section — every trade,
+// waiver claim, free-agent move, and draft pick found across the league's
+// history, merged into one chronological feed (most recent first) with
+// player names resolved for display. Trades keep their per-side "value
+// produced" (collectTrades already computes it, for the AI-analyze
+// feature); waiver moves and draft picks don't need that number, so their
+// collectors above skip the expensive weekly-points pass entirely.
+export async function computeTransactionHistory(chain, playersMap, lang = "en") {
+  const tr = (en, es) => (lang === "es" ? es : en);
+  const playerName = (id) => playersMap.get(id)?.name || tr(`Player ${id}`, `Jugador ${id}`);
   const namesOf = (ids) => ids.map(playerName).join(", ");
 
-  return trades
-    .sort((a, b) => (b.season === a.season ? b.week - a.week : b.season.localeCompare(a.season)))
-    .map((t) => ({
+  const [trades, waiverMoves, draftPicks] = await Promise.all([
+    collectTrades(chain),
+    collectWaiverMoves(chain),
+    collectDraftPickEvents(chain),
+  ]);
+
+  const events = [
+    ...trades.map((t) => ({
+      type: "trade",
       season: t.season,
       week: t.week,
+      timestamp: t.timestamp,
+      pickNo: -1,
       sideA: { ownerId: t.winner.owner.ownerId, displayName: t.winner.owner.displayName, players: namesOf(t.winner.players), value: t.winner.value },
       sideB: { ownerId: t.loser.owner.ownerId, displayName: t.loser.owner.displayName, players: namesOf(t.loser.players), value: t.loser.value },
-    }));
+    })),
+    ...waiverMoves.map((m) => ({
+      type: m.waiverType,
+      season: m.season,
+      week: m.week,
+      timestamp: m.timestamp,
+      pickNo: -1,
+      owner: { ownerId: m.owner.ownerId, displayName: m.owner.displayName },
+      added: namesOf(m.added),
+      dropped: namesOf(m.dropped),
+    })),
+    ...draftPicks.map((p) => ({
+      type: "draft",
+      season: p.season,
+      week: null,
+      timestamp: p.timestamp,
+      pickNo: p.pickNo,
+      round: p.round,
+      owner: { ownerId: p.owner.ownerId, displayName: p.owner.displayName },
+      player: playerName(p.playerId),
+    })),
+  ];
+
+  // Newest first; pickNo only breaks ties within the same draft (every
+  // other event type sets it to -1, so it's a no-op there).
+  return events.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0) || b.pickNo - a.pickNo);
 }
 
 async function computeTradeNarratives(chain, playersMap, lang) {

@@ -43,7 +43,7 @@ function applyHighlight() {
   });
 
   renderRivalries(ownerId);
-  if (window.renderTradeTracker) window.renderTradeTracker(ownerId, myName);
+  if (window.renderTransactionHistory) window.renderTransactionHistory(ownerId, myName);
   if (window.setTradeAnalyzerOfferTeam) window.setTradeAnalyzerOfferTeam(ownerId, myName);
 }
 

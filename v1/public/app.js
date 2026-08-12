@@ -7,18 +7,19 @@ const leagueSubmit = document.getElementById("league-submit");
 
 let activeLeagueId = null;
 let turnstileToken = null; // set by onTurnstileSuccess (Cloudflare Turnstile, index.html) — sent as X-Turnstile-Token on the first request; the server's response cookie covers every later one in the session
-let allTrades = []; // full tradeTracker list from the last load — renderTradeTracker() filters/slices from this, no re-fetch needed
-const TRADE_TRACKER_LIMIT = 5;
-const tradeTrackerSelect = document.getElementById("trade-tracker-select");
+let allTransactions = []; // full transactionHistory list from the last load — renderTransactionHistory() filters/slices from this, no re-fetch needed
+const TRANSACTION_HISTORY_LIMIT = 5;
+const transactionHistorySelect = document.getElementById("transaction-history-select");
 // Independent from "Mi equipo" (that selector answers "who am I" and drives
-// highlighting across the whole page); this one only answers "whose trades
-// do I want to browse right now" and only affects this section. Seeded from
-// "Mi equipo" whenever it changes (see renderTradeTracker), but a manual
-// pick here doesn't touch "Mi equipo" or anything outside this section.
-tradeTrackerSelect.addEventListener("change", () => {
-  const ownerId = tradeTrackerSelect.value || null;
-  const filterName = ownerId ? tradeTrackerSelect.options[tradeTrackerSelect.selectedIndex].textContent : null;
-  renderTradeTracker(ownerId, filterName);
+// highlighting across the whole page); this one only answers "whose
+// transactions do I want to browse right now" and only affects this
+// section. Seeded from "Mi equipo" whenever it changes (see
+// renderTransactionHistory), but a manual pick here doesn't touch "Mi
+// equipo" or anything outside this section.
+transactionHistorySelect.addEventListener("change", () => {
+  const ownerId = transactionHistorySelect.value || null;
+  const filterName = ownerId ? transactionHistorySelect.options[transactionHistorySelect.selectedIndex].textContent : null;
+  renderTransactionHistory(ownerId, filterName);
 });
 let currentPointsReport = null; // full positionPointsReport payload — scope toggle re-renders from this, no re-fetch needed
 let pointsReportScope = "starters"; // persists across scope changes within a session (not saved — resets on reload, unlike Mi equipo)
@@ -165,23 +166,32 @@ function render(data) {
   toggleSection("power-rankings-section", "power-rankings", data.powerRankings, powerRankingsTable, true);
   toggleSection("season-trend-section", "season-trend", data.seasonTrend, seasonTrendHtml);
   toggleSection("luck-index-section", "luck-index", data.luckIndex, luckIndexHtml);
-  allTrades = data.tradeTracker || [];
+  allTransactions = data.transactionHistory || [];
   const options = data.goat
     .map((g) => `<option value="${escapeHtml(g.ownerId)}">${escapeHtml(g.displayName)}</option>`)
     .join("");
-  tradeTrackerSelect.innerHTML = `<option value="">${escapeHtml(t("tradeTrackerSearchPlaceholder"))}</option>${options}`;
-  renderTradeTracker(null, null);
+  transactionHistorySelect.innerHTML = `<option value="">${escapeHtml(t("transactionHistorySearchPlaceholder"))}</option>${options}`;
+  renderTransactionHistory(null, null);
 }
 
-// Last N trades, league-wide by default or scoped to one manager (either
-// side of the trade) — via "Mi equipo" or the section's own manager search.
-// Trades are already sorted newest-first by computeTradeTracker, so slicing
+// An event "involves" a manager if they're on either side of a trade, or
+// the owner of a waiver/free-agent move or draft pick — the three shapes
+// computeTransactionHistory can return (see transactionRowHtml below).
+function eventInvolvesOwner(event, ownerId) {
+  if (event.type === "trade") return event.sideA.ownerId === ownerId || event.sideB.ownerId === ownerId;
+  return event.owner?.ownerId === ownerId;
+}
+
+// Last N transactions (trades, waiver claims, free-agent moves, draft
+// picks — whichever actually happened), league-wide by default or scoped
+// to one manager via "Mi equipo" or the section's own manager search.
+// Already sorted newest-first by computeTransactionHistory, so slicing
 // after filtering keeps them in order. Returns the total filtered count too
-// (not just the slice) so the hint can say "all 3 trades" instead of
-// implying there are 5 when a manager has traded less than that.
-function filterAndLimitTrades(ownerId) {
-  const filtered = ownerId ? allTrades.filter((t) => t.sideA.ownerId === ownerId || t.sideB.ownerId === ownerId) : allTrades;
-  return { trades: filtered.slice(0, TRADE_TRACKER_LIMIT), total: filtered.length };
+// (not just the slice) so the hint can say "all 3 transactions" instead of
+// implying there are 5 when a manager has fewer than that on record.
+function filterAndLimitTransactions(ownerId) {
+  const filtered = ownerId ? allTransactions.filter((e) => eventInvolvesOwner(e, ownerId)) : allTransactions;
+  return { transactions: filtered.slice(0, TRANSACTION_HISTORY_LIMIT), total: filtered.length };
 }
 
 // filterName is the already-resolved display name for the scope hint —
@@ -190,12 +200,19 @@ function filterAndLimitTrades(ownerId) {
 // Also keeps the section's own <select> in sync when the filter was driven
 // externally (e.g. "Mi equipo" changing), without re-triggering its change
 // handler.
-function renderTradeTracker(ownerId, filterName) {
-  const { trades, total } = filterAndLimitTrades(ownerId);
-  toggleSection("trade-tracker-section", "trade-tracker", trades, (t) => tradeTrackerHtml(t, ownerId ? filterName : null, total), false, true);
-  tradeTrackerSelect.value = ownerId || "";
+function renderTransactionHistory(ownerId, filterName) {
+  const { transactions, total } = filterAndLimitTransactions(ownerId);
+  toggleSection(
+    "transaction-history-section",
+    "transaction-history",
+    transactions,
+    (list) => transactionHistoryHtml(list, ownerId ? filterName : null, total),
+    false,
+    true
+  );
+  transactionHistorySelect.value = ownerId || "";
 }
-window.renderTradeTracker = renderTradeTracker;
+window.renderTransactionHistory = renderTransactionHistory;
 
 // Shows/hides a section based on whether its data is present, and renders
 // into it when shown. `wrapScroll` scrollWraps the table; `allowEmpty`
@@ -578,19 +595,40 @@ function luckIndexHtml(luckIndex) {
   return `<div class="narrative-grid">${card(t("luckIndexMostUnlucky"), mostUnlucky)}${luckiest !== mostUnlucky ? card(t("luckIndexMostLucky"), luckiest) : ""}</div>`;
 }
 
-function tradeTrackerHtml(trades, filterName, total) {
-  const hasFewer = total < TRADE_TRACKER_LIMIT;
-  const scopeHint = `<p class="hint trade-tracker-scope">${
+function transactionHistoryHtml(transactions, filterName, total) {
+  const hasFewer = total < TRANSACTION_HISTORY_LIMIT;
+  const scopeHint = `<p class="hint transaction-history-scope">${
     filterName
-      ? hasFewer ? t("tradeTrackerScopeTeamAll", filterName, total) : t("tradeTrackerScopeTeam", filterName)
-      : hasFewer ? t("tradeTrackerScopeLeagueAll", total) : t("tradeTrackerScopeLeague")
+      ? hasFewer ? t("transactionHistoryScopeTeamAll", filterName, total) : t("transactionHistoryScopeTeam", filterName)
+      : hasFewer ? t("transactionHistoryScopeLeagueAll", total) : t("transactionHistoryScopeLeague")
   }</p>`;
-  if (!trades.length) return scopeHint + `<p class="hint">${t("tradeTrackerEmpty")}</p>`;
-  return scopeHint + trades
-    .map(
-      (trade) => `
-    <div class="trade-row">
-      <div class="trade-meta hint">${escapeHtml(trade.season)} · ${escapeHtml(t("weekShort", trade.week))}</div>
+  if (!transactions.length) return scopeHint + `<p class="hint">${t("transactionHistoryEmpty")}</p>`;
+  return scopeHint + transactions.map(transactionRowHtml).join("");
+}
+
+// One event, one of three shapes coming out of computeTransactionHistory —
+// dispatches on `type` rather than trying to force trades/waiver-moves/
+// draft-picks into a single row template, since they don't share a natural
+// "who received what" structure (a trade has two sides, a waiver move has
+// one side with an add and/or a drop, a draft pick has neither).
+function transactionRowHtml(event) {
+  if (event.type === "trade") return tradeRowHtml(event);
+  if (event.type === "draft") return draftPickRowHtml(event);
+  return waiverMoveRowHtml(event); // "waiver" | "free_agent"
+}
+
+function transactionMetaHtml(event, typeLabel) {
+  const weekPart = event.week != null ? ` · ${escapeHtml(t("weekShort", event.week))}` : "";
+  return `<div class="transaction-meta hint">${escapeHtml(event.season)}${weekPart} · ${typeLabel}</div>`;
+}
+
+// The only row type with an AI-analyze trigger — "who won this trade" is a
+// meaningful question for a two-sided trade; it isn't for a solo waiver
+// claim or a draft pick, so those don't get the button at all.
+function tradeRowHtml(trade) {
+  return `
+    <div class="transaction-row">
+      ${transactionMetaHtml(trade, `🔄 ${escapeHtml(t("transactionTypeTrade"))}`)}
       <div class="trade-sides">
         <div class="trade-side"><b>${escapeHtml(trade.sideA.displayName)}</b> ${t("tradeTrackerReceived")} ${escapeHtml(trade.sideA.players)}</div>
         <div class="trade-vs">⇄</div>
@@ -611,14 +649,36 @@ function tradeTrackerHtml(trades, filterName, total) {
         >${t("aiAnalyzeBtn")}</button>
         <div class="ai-result" hidden></div>
       </div>
-    </div>`
-    )
-    .join("");
+    </div>`;
 }
 
-// Delegated (not per-button) since trade rows are re-rendered wholesale on
-// every language switch / league reload — a listener bound to a specific
-// button node would be orphaned the next time tradeTrackerHtml() runs.
+function waiverMoveRowHtml(move) {
+  const icon = move.type === "waiver" ? "🔁" : "🟢";
+  const typeLabel = move.type === "waiver" ? t("transactionTypeWaiver") : t("transactionTypeFreeAgent");
+  const action = move.added && move.dropped
+    ? t("transactionAddedDropped", move.added, move.dropped)
+    : move.added
+      ? t("transactionAddedOnly", move.added)
+      : t("transactionDroppedOnly", move.dropped);
+  return `
+    <div class="transaction-row">
+      ${transactionMetaHtml(move, `${icon} ${escapeHtml(typeLabel)}`)}
+      <div class="waiver-move"><b>${escapeHtml(move.owner.displayName)}</b> ${escapeHtml(action)}</div>
+    </div>`;
+}
+
+function draftPickRowHtml(pick) {
+  return `
+    <div class="transaction-row">
+      ${transactionMetaHtml(pick, `📋 ${escapeHtml(t("transactionTypeDraft"))}`)}
+      <div class="draft-pick"><b>${escapeHtml(pick.owner.displayName)}</b> ${escapeHtml(t("transactionDrafted", pick.player, pick.round, pick.pickNo))}</div>
+    </div>`;
+}
+
+// Delegated (not per-button) since transaction rows are re-rendered
+// wholesale on every language switch / league reload — a listener bound to
+// a specific button node would be orphaned the next time
+// transactionHistoryHtml() runs.
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest(".ai-analyze-btn");
   if (!btn) return;

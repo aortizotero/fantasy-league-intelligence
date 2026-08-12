@@ -18,7 +18,7 @@ import {
   computePowerRankings,
   computeTrophyCase,
   computePlayoffBracket,
-  computeTradeTracker,
+  computeTransactionHistory,
   computeRosterValue,
   computePositionPointsReport,
   computeRosterPlayerPool,
@@ -103,7 +103,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       powerRankings,
       trophyCase,
       playoffBracket,
-      tradeTracker,
+      transactionHistory,
       rosterValue,
       positionPointsReport,
       rosterPlayerPool,
@@ -116,7 +116,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       computePowerRankings(league),
       computeTrophyCase(chain, historicalStandings),
       computePlayoffBracket(league),
-      computeTradeTracker(chain, playersMap),
+      computeTransactionHistory(chain, playersMap, lang),
       computeRosterValue(league, playersMap),
       computePositionPointsReport(league, playersMap),
       computeRosterPlayerPool(league, playersMap),
@@ -138,7 +138,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       powerRankings,
       trophyCase,
       playoffBracket,
-      tradeTracker,
+      transactionHistory,
       rosterValue,
       positionPointsReport,
       rosterPlayerPool,
@@ -149,10 +149,11 @@ app.get("/api/league/:leagueId", async (req, res) => {
   }
 });
 
-// AI narrative for one trade the client already knows about (from
-// tradeTracker) — generated on demand rather than for every trade on page
-// load, since it's a paid API call. Validates shape/length rather than
-// trusting the client, since this hits Claude directly and isn't rate-limited.
+// AI narrative for one trade the client already knows about (from the
+// Transaction History feed) — generated on demand rather than for every
+// trade on page load, since it's a paid API call. Validates shape/length
+// rather than trusting the client, since this hits Claude directly and
+// isn't rate-limited.
 function isValidTradeSide(side) {
   return (
     side &&

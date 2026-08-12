@@ -215,7 +215,7 @@ section h2 { margin-top: 0; }
 .section-group-header::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
 .season-filter-bar { display: flex; align-items: center; gap: 10px; margin: 4px 4px 20px; font-size: 14px; }
-.trade-tracker-search { margin: 4px 0 16px; }
+.transaction-history-search { margin: 4px 0 16px; }
 
 /* Shared control style for every standalone <select> in the app (season
    filter, trade tracker search, my team, points report scope, trade
@@ -419,8 +419,8 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
 
 /* Shared "pill trigger" button base — small, outlined, transparent-bg
    buttons used for the share/AI-analyze triggers scattered across the app
-   (.card-trigger-btn, .ai-analyze-btn, .ta-analyze-btn — see Trade Tracker
-   below for the latter two). One size/shape definition; each keeps its own
+   (.card-trigger-btn, .ai-analyze-btn, .ta-analyze-btn — see Transaction
+   History below for the latter two). One size/shape definition; each keeps its own
    default text weight/color, but hover and disabled read the same way
    everywhere instead of being redeclared per section. */
 .card-trigger-btn,
@@ -648,10 +648,17 @@ th.is-me { color: var(--accent-text); }
 .sparkline { width: 160px; height: 32px; flex-shrink: 0; }
 .sparkline polyline { fill: none; stroke: var(--accent); stroke-width: 2; }
 
-/* ---- Trade Tracker ------------------------------------------------------ */
-.trade-row { padding: 12px 0; border-bottom: 1px solid var(--border); }
-.trade-row:last-child { border-bottom: none; }
-.trade-meta { margin-bottom: 6px; }
+/* ---- Transaction History -------------------------------------------------
+   One feed, three row shapes: a trade (two sides + AI-analyze), a waiver/
+   free-agent move (single owner, added/dropped text), or a draft pick
+   (single owner, player + round/pick). .transaction-row/.transaction-meta
+   are shared by all three; .trade-sides/.trade-side/.trade-vs/.trade-ai
+   below are trade-only, and .waiver-move/.draft-pick are single-line text
+   rows with no extra structure of their own. */
+.transaction-row { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.transaction-row:last-child { border-bottom: none; }
+.transaction-meta { margin-bottom: 6px; }
+.waiver-move, .draft-pick { font-size: 14px; line-height: 1.4; }
 .trade-sides { display: flex; align-items: center; gap: 12px; }
 .trade-side { flex: 1; font-size: 14px; line-height: 1.4; }
 .trade-vs { color: var(--muted); font-size: 12px; flex-shrink: 0; }
