@@ -53,7 +53,8 @@ const STRINGS = {
     narrativesTitle: "📖 The Stories of Your League",
     narrativesHint: "What the numbers don't tell you at a glance.",
 
-    currentStandingsTitle: "Standings — Current Season",
+    currentStandingsTitle: "Where You Stand",
+    currentStandingsHint: "This season so far.",
     colNum: "#",
     colManager: "Manager",
     colRecord: "Record",
@@ -73,7 +74,7 @@ const STRINGS = {
     shareGoatRanking: (name) => `Share ${name}'s ranking`,
 
     h2hTitle: "Head-to-Head",
-    h2hHint: "Record between every pair of managers, across all seasons.",
+    h2hHint: "Every grudge match on the books, across every season.",
     shareH2H: "Share this head-to-head",
 
     seasonFilterLabel: "Season",
@@ -88,7 +89,7 @@ const STRINGS = {
     rosterValueTitle: "💰 Roster Value",
     rosterValueHint: "Current dynasty trade value per position, from FantasyCalc — who's actually stacked in trade-value terms, not just player count.",
     pointsReportTitle: "📈 Points Report",
-    pointsReportHint: "Actual vs. projected points by position for the last played week — switch scope to see just starters, starters plus the whole bench, or starters plus each position's best bench option.",
+    pointsReportHint: "Who beat their projection last week.",
     pointsReportWeek: (season, week) => `Week ${week}, ${season}`,
     pointsReportScopeLabel: "Scope",
     pointsReportScopeStarters: "Starters",
@@ -138,18 +139,18 @@ const STRINGS = {
     trophyCaseEmptySeason: "This season hasn't crowned a champion yet.",
 
     bracketTitle: "🗂️ Playoff Bracket",
-    bracketHint: "Current season only.",
+    bracketHint: "Who's still alive in the playoff chase — current season only.",
     bracketTbd: "TBD",
     bracketRound: (r) => `Round ${r}`,
 
     powerRankingsTitle: "📊 Power Rankings",
-    powerRankingsHint: "Blends record and points-for — not the same as the standings table. Movement since last week.",
+    powerRankingsHint: "Who's actually good right now, not just who's lucky.",
 
     seasonTrendTitle: "📈 Season Trend",
     seasonTrendHint: "Points For by week, current season.",
 
     luckIndexTitle: "🍀 Luck Index",
-    luckIndexHint: "Expected record vs. actual, based on how you'd have done against every team's score each week — not just your real opponent.",
+    luckIndexHint: "Is your record earned, or is your schedule carrying you?",
     luckIndexMostUnlucky: "🍀 Most Unlucky",
     luckIndexMostLucky: "🐰 Luckiest",
     luckIndexDetail: (name, actual, expected) => `${name} — actual record ${actual}, expected ${expected} based on schedule luck.`,
@@ -260,7 +261,8 @@ const STRINGS = {
     narrativesTitle: "📖 Las Historias de tu Liga",
     narrativesHint: "Lo que los números no te dicen a simple vista.",
 
-    currentStandingsTitle: "Standings — Temporada Actual",
+    currentStandingsTitle: "Cómo Vas",
+    currentStandingsHint: "Esta temporada, hasta ahora.",
     colNum: "#",
     colManager: "Manager",
     colRecord: "Record",
@@ -280,7 +282,7 @@ const STRINGS = {
     shareGoatRanking: (name) => `Compartir el ranking de ${name}`,
 
     h2hTitle: "Head-to-Head",
-    h2hHint: "Récord entre cada par de managers, a través de todas las temporadas.",
+    h2hHint: "Cada rivalidad registrada, de todas las temporadas.",
     shareH2H: "Compartir este head-to-head",
 
     seasonFilterLabel: "Temporada",
@@ -295,7 +297,7 @@ const STRINGS = {
     rosterValueTitle: "💰 Valor de Roster",
     rosterValueHint: "Valor actual de trade por posición según FantasyCalc — quién está realmente stacked en términos de valor, no solo de cantidad de jugadores.",
     pointsReportTitle: "📈 Reporte de Puntos",
-    pointsReportHint: "Puntos reales vs. proyectados por posición en la última semana jugada — cambia el alcance para ver solo titulares, titulares más toda la banca, o titulares más la mejor opción de banca en cada posición.",
+    pointsReportHint: "Quién superó su proyección la semana pasada.",
     pointsReportWeek: (season, week) => `Semana ${week}, ${season}`,
     pointsReportScopeLabel: "Alcance",
     pointsReportScopeStarters: "Titulares",
@@ -345,18 +347,18 @@ const STRINGS = {
     trophyCaseEmptySeason: "Esta temporada todavía no tiene campeón.",
 
     bracketTitle: "🗂️ Bracket de Playoffs",
-    bracketHint: "Solo temporada actual.",
+    bracketHint: "Quién sigue vivo en la pelea de playoffs — solo temporada actual.",
     bracketTbd: "Por definir",
     bracketRound: (r) => `Ronda ${r}`,
 
     powerRankingsTitle: "📊 Power Rankings",
-    powerRankingsHint: "Combina récord y puntos anotados — no es lo mismo que la tabla de standings. Movimiento desde la semana pasada.",
+    powerRankingsHint: "Quién es bueno de verdad ahorita, no solo quién tiene suerte.",
 
     seasonTrendTitle: "📈 Tendencia de Temporada",
     seasonTrendHint: "Puntos anotados por semana, temporada actual.",
 
     luckIndexTitle: "🍀 Índice de Suerte",
-    luckIndexHint: "Récord esperado vs. real, basado en cómo te hubiera ido contra el puntaje de todos los equipos cada semana — no solo tu rival real.",
+    luckIndexHint: "¿Tu récord te lo ganaste, o te está cargando el calendario?",
     luckIndexMostUnlucky: "🍀 El Más Desafortunado",
     luckIndexMostLucky: "🐰 El Más Suertudo",
     luckIndexDetail: (name, actual, expected) => `${name} — récord real ${actual}, esperado ${expected} según la suerte del calendario.`,

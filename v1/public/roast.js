@@ -107,8 +107,11 @@ roastBtn.addEventListener("click", async () => {
     // Shareable card — same "data rides on the trigger button" pattern as
     // the "Mi equipo" rivalry cards (cards.js's "personal" case): the roast
     // is an on-demand AI result, not part of currentData, so it's carried
-    // as dataset attributes instead of an index lookup.
-    const shareBtnHtml = `<button class="card-trigger-btn card-share-btn" type="button" data-card="roast" data-display-name="${escapeHtml(payload.displayName)}" data-grade="${escapeHtml(data.grade)}" data-roast="${escapeHtml(data.roast)}" data-suggestions="${escapeHtml((data.suggestions || []).join(" ||| "))}">${escapeHtml(t("roastShareBtn"))}</button>`;
+    // as dataset attributes instead of an index lookup. data.summary is a
+    // card-length headline Claude writes in the same call (see
+    // lib/claude.js), not a truncated version of the full roast — falls
+    // back to the full roast (CSS line-clamped) if it's null.
+    const shareBtnHtml = `<button class="card-trigger-btn card-share-btn" type="button" data-card="roast" data-display-name="${escapeHtml(payload.displayName)}" data-grade="${escapeHtml(data.grade)}" data-summary="${escapeHtml(data.summary || data.roast)}" data-suggestions="${escapeHtml((data.suggestions || []).join(" ||| "))}">${escapeHtml(t("roastShareBtn"))}</button>`;
     roastResultEl.innerHTML = `<span class="grade-badge grade-${escapeHtml(data.grade)}">${escapeHtml(t("roastGradeLabel", data.grade))}</span><p>${escapeHtml(data.roast)}</p>${suggestions}${shareBtnHtml}`;
   } catch (err) {
     roastResultEl.textContent = err.message || t("aiError");

@@ -124,7 +124,7 @@ function buildCardHtml(ds) {
     // so there's no currentData index to look up.
     case "roast": {
       const suggestions = (ds.suggestions || "").split(" ||| ").filter(Boolean);
-      return roastCardHtml(ds.displayName, ds.grade, ds.roast, suggestions, leagueName);
+      return roastCardHtml(ds.displayName, ds.grade, ds.summary, suggestions, leagueName);
     }
     case "tradeVerdict":
       return tradeVerdictCardHtml(ds, leagueName);
@@ -229,20 +229,6 @@ function aiCardShell(bodyHtml, extraClass = "") {
   </div>`;
 }
 
-// The AI-card body (see .ai-body's fixed height in style.css) has a hard
-// pixel budget, not an unlimited scroll area like the inline result — AI
-// text has no length guarantee, so it gets cut off by .ai-card's
-// overflow:hidden once it runs long. Truncating before render (rather than
-// relying on overflow:hidden alone) keeps the card looking intentional —
-// "…" at a clean boundary instead of a sentence sliced mid-word at the
-// card's bottom edge. Budgets are conservative estimates for a 9:16 card at
-// these font sizes, not exact pixel math — the AI's real output usually
-// runs under the cap anyway (the prompts already ask for short copy).
-function truncate(str, max) {
-  if (!str || str.length <= max) return str || "";
-  return str.slice(0, max - 1).trimEnd() + "…";
-}
-
 // D/F grade -> red (bad), C -> amber (warn), A/B -> default green (good).
 function gradeCardClass(grade) {
   if (grade === "D" || grade === "F") return "ai-card--bad";
@@ -258,21 +244,26 @@ function verdictCardClass(verdict) {
   return "";
 }
 
-function roastCardHtml(displayName, grade, roast, suggestions, leagueName) {
+// `summary` is the card-length headline Claude writes alongside the full
+// roast (see lib/claude.js's buildRoastPrompt) — not the full roast text.
+// CSS line-clamp on .ai-text (style.css) is still there as a safety net for
+// the rare case Claude's summary runs long or the JSON parse fell back to
+// the full roast (see roast.js).
+function roastCardHtml(displayName, grade, summary, suggestions, leagueName) {
   const todoHtml = suggestions.length
     ? `<div class="todo-box">
         <div class="todo-label">${escapeHtml(t("roastSuggestionsTitle"))}</div>
-        ${suggestions.slice(0, 2).map((s) => `<div class="todo-item">${escapeHtml(truncate(s, 40))}</div>`).join("")}
+        ${suggestions.slice(0, 2).map((s) => `<div class="todo-item"><span class="todo-item-text">${escapeHtml(s)}</span></div>`).join("")}
       </div>`
     : "";
   return aiCardShell(
     `
     <div class="ai-kicker">${escapeHtml(t("cardRoastEyebrow", leagueName))}</div>
-    <div class="ai-card-name">${escapeHtml(truncate(displayName, 20))}</div>
+    <div class="ai-card-name">${escapeHtml(displayName)}</div>
     <div class="grade-ring"><div class="grade-letter">${escapeHtml(grade)}</div></div>
     <div class="grade-caption">${escapeHtml(t("roastGradeCaption"))}</div>
     <div class="ai-divider"></div>
-    <div class="ai-text">${escapeHtml(truncate(roast, 160))}</div>
+    <div class="ai-text">${escapeHtml(summary)}</div>
     ${todoHtml}`,
     gradeCardClass(grade)
   );
@@ -287,20 +278,20 @@ function tradeVerdictCardHtml(ds, leagueName) {
     <div class="vs-row">
       <div class="vs-side winner">
         <div class="vs-crown">👑</div>
-        <div class="vs-name">${escapeHtml(truncate(ds.aName, 20))}</div>
-        <div class="vs-players">${escapeHtml(truncate(ds.aPlayers, 45))}</div>
+        <div class="vs-name">${escapeHtml(ds.aName)}</div>
+        <div class="vs-players">${escapeHtml(ds.aPlayers)}</div>
         <div class="vs-value">${Number(ds.aValue).toFixed(1)} pts</div>
       </div>
       <div class="vs-mid">⇄</div>
       <div class="vs-side">
         <div class="vs-crown">&nbsp;</div>
-        <div class="vs-name">${escapeHtml(truncate(ds.bName, 20))}</div>
-        <div class="vs-players">${escapeHtml(truncate(ds.bPlayers, 45))}</div>
+        <div class="vs-name">${escapeHtml(ds.bName)}</div>
+        <div class="vs-players">${escapeHtml(ds.bPlayers)}</div>
         <div class="vs-value">${Number(ds.bValue).toFixed(1)} pts</div>
       </div>
     </div>
     <div class="ai-divider"></div>
-    <div class="ai-text">${escapeHtml(truncate(ds.analysis, 150))}</div>`);
+    <div class="ai-text">${escapeHtml(ds.summary)}</div>`);
 }
 
 // Trade Analyzer — hypothetical, not-yet-made trade, so the "Hypothetical"
@@ -315,17 +306,17 @@ function tradeAnalyzerCardHtml(ds, leagueName) {
     <div class="vs-row">
       <div class="vs-side">
         <div class="vs-name">${escapeHtml(t("tradeAnalyzerYouOffer"))}</div>
-        <div class="vs-players">${escapeHtml(truncate(ds.offerPlayers, 45))}</div>
+        <div class="vs-players">${escapeHtml(ds.offerPlayers)}</div>
       </div>
       <div class="vs-mid">⇄</div>
       <div class="vs-side">
         <div class="vs-name">${escapeHtml(t("tradeAnalyzerYouRequest"))}</div>
-        <div class="vs-players">${escapeHtml(truncate(ds.requestPlayers, 45))}</div>
+        <div class="vs-players">${escapeHtml(ds.requestPlayers)}</div>
       </div>
     </div>
     <div class="verdict-pill">${escapeHtml(t(ds.verdict))}</div>
     <div class="ai-divider"></div>
-    <div class="ai-text">${escapeHtml(truncate(ds.interpretation, 150))}</div>`,
+    <div class="ai-text">${escapeHtml(ds.summary)}</div>`,
     verdictCardClass(ds.verdict)
   );
 }

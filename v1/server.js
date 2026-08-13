@@ -181,8 +181,11 @@ app.post("/api/trade-analysis", async (req, res) => {
   }
 
   try {
-    const analysis = await analyzeTrade({ season, week, sideA, sideB }, lang);
-    res.json({ analysis });
+    // { analysis, summary } — summary is a card-length headline generated
+    // in the same call, so the shareable card doesn't have to truncate the
+    // full analysis (see lib/claude.js's buildPrompt).
+    const result = await analyzeTrade({ season, week, sideA, sideB }, lang);
+    res.json(result);
   } catch (err) {
     if (err.message === "AI_NOT_CONFIGURED") {
       return res.status(503).json({ error: errors.notConfigured });

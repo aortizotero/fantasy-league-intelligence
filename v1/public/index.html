@@ -116,7 +116,13 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <p class="hint" data-i18n="myTeamHint">Highlights your rows in standings, GOAT, and H2H, and flags the stories that mention you.</p>
     </section>
 
-    <div class="section-group-header" data-i18n="groupRightNow">🟢 Right Now</div>
+    <nav class="jump-nav" id="jump-nav" aria-label="Jump to section">
+      <button type="button" class="jump-pill active" data-target="group-right-now" data-i18n="groupRightNow">🟢 Right Now</button>
+      <button type="button" class="jump-pill" data-target="group-history" data-i18n="groupHistory">🕰️ League History</button>
+      <button type="button" class="jump-pill" data-target="group-analyze" data-i18n="groupAnalyze">🔮 Analyze &amp; Plan</button>
+    </nav>
+
+    <div class="section-group-header" id="group-right-now" data-i18n="groupRightNow">🟢 Right Now</div>
 
     <section id="week-recap-section" hidden>
       <h2 data-i18n="weekRecapTitle">📅 Week Recap</h2>
@@ -124,19 +130,20 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </section>
 
     <section>
-      <h2 data-i18n="currentStandingsTitle">Standings — Current Season</h2>
+      <h2 data-i18n="currentStandingsTitle">Where You Stand</h2>
+      <p class="hint" data-i18n="currentStandingsHint">This season so far.</p>
       <div id="current-standings"></div>
     </section>
 
     <section id="bracket-section" hidden>
       <h2 data-i18n="bracketTitle">🗂️ Playoff Bracket</h2>
-      <p class="hint" data-i18n="bracketHint">Current season only.</p>
+      <p class="hint" data-i18n="bracketHint">Who's still alive in the playoff chase — current season only.</p>
       <div id="playoff-bracket"></div>
     </section>
 
     <section id="power-rankings-section" hidden>
       <h2 data-i18n="powerRankingsTitle">📊 Power Rankings</h2>
-      <p class="hint" data-i18n="powerRankingsHint">Blends record and points-for — not the same as the standings table. Movement since last week.</p>
+      <p class="hint" data-i18n="powerRankingsHint">Who's actually good right now, not just who's lucky.</p>
       <div id="power-rankings"></div>
     </section>
 
@@ -148,7 +155,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
     <section id="luck-index-section" hidden>
       <h2 data-i18n="luckIndexTitle">🍀 Luck Index</h2>
-      <p class="hint" data-i18n="luckIndexHint">Expected record vs. actual, based on how you'd have done against every team's score each week — not just your real opponent.</p>
+      <p class="hint" data-i18n="luckIndexHint">Is your record earned, or is your schedule carrying you?</p>
       <div id="luck-index"></div>
     </section>
 
@@ -166,7 +173,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
     <section id="points-report-section" hidden>
       <h2 data-i18n="pointsReportTitle">📈 Points Report</h2>
-      <p class="hint" data-i18n="pointsReportHint">Actual vs. projected points by position for the last played week — switch scope to see just starters, starters plus the whole bench, or starters plus each position's best bench option.</p>
+      <p class="hint" data-i18n="pointsReportHint">Who beat their projection last week.</p>
       <div id="points-report"></div>
     </section>
 
@@ -176,7 +183,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div id="draft-picks"></div>
     </section>
 
-    <div class="section-group-header" data-i18n="groupHistory">🕰️ League History</div>
+    <div class="section-group-header" id="group-history" data-i18n="groupHistory">🕰️ League History</div>
 
     <section id="rivalry-section" hidden>
       <h2 data-i18n="rivalryTitle">⚔️ Your Rivalries</h2>
@@ -201,13 +208,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
     <section>
       <h2 data-i18n="h2hTitle">Head-to-Head</h2>
-      <p class="hint" data-i18n="h2hHint">Record between every pair of managers, across all seasons.</p>
+      <p class="hint" data-i18n="h2hHint">Every grudge match on the books, across every season.</p>
       <div id="h2h"></div>
     </section>
 
     <div class="season-filter-bar">
-      <label for="season-filter" data-i18n="seasonFilterLabel">Season</label>
-      <select id="season-filter"></select>
+      <div id="season-filter" class="segmented-filter" role="group" data-i18n-aria-label="seasonFilterLabel" aria-label="Season"></div>
     </div>
 
     <section>
@@ -229,7 +235,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div id="transaction-history"></div>
     </section>
 
-    <div class="section-group-header" data-i18n="groupAnalyze">🔮 Analyze &amp; Plan</div>
+    <div class="section-group-header" id="group-analyze" data-i18n="groupAnalyze">🔮 Analyze &amp; Plan</div>
 
     <section id="roast-section" hidden>
       <h2 data-i18n="roastTitle">🔥 Roast My Team</h2>

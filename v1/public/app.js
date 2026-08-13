@@ -159,6 +159,42 @@ function dismissScrollHint() {
   localStorage.setItem(SCROLL_HINT_SEEN_KEY, "1");
 }
 
+// Sticky jump-nav — scroll-to on click, active-group highlight on scroll.
+// Wired once at load: the 3 groups are always in the DOM (only their
+// *inner* sections toggle hidden based on what data the league has), so
+// there's nothing to re-init per league load.
+const jumpNav = document.getElementById("jump-nav");
+const jumpPills = jumpNav.querySelectorAll(".jump-pill");
+const jumpGroups = [...jumpPills].map((p) => document.getElementById(p.dataset.target));
+
+const PREFERS_REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+jumpPills.forEach((pill) => {
+  pill.addEventListener("click", () => {
+    const target = document.getElementById(pill.dataset.target);
+    const top = target.getBoundingClientRect().top + window.scrollY - jumpNav.offsetHeight - 8;
+    window.scrollTo({ top, behavior: PREFERS_REDUCED_MOTION ? "auto" : "smooth" });
+  });
+});
+
+// rAF-throttled so this never runs more than once per frame regardless of
+// how many scroll events fire.
+let jumpSpyQueued = false;
+function updateActiveJumpPill() {
+  jumpSpyQueued = false;
+  const pos = window.scrollY + jumpNav.offsetHeight + 20;
+  let activeIndex = 0;
+  jumpGroups.forEach((group, i) => {
+    if (group.getBoundingClientRect().top + window.scrollY <= pos) activeIndex = i;
+  });
+  jumpPills.forEach((p, i) => p.classList.toggle("active", i === activeIndex));
+}
+window.addEventListener("scroll", () => {
+  if (jumpSpyQueued) return;
+  jumpSpyQueued = true;
+  requestAnimationFrame(updateActiveJumpPill);
+});
+
 function render(data) {
   currentLeagueData = data;
   document.getElementById("league-info").innerHTML = `
@@ -188,9 +224,9 @@ function render(data) {
   populateSeasonFilter(data.historicalStandings);
   renderSeasonScoped();
 
-  document.getElementById("roster-depth").innerHTML = scrollWrap(rosterDepthTable(data.rosterDepth));
+  document.getElementById("roster-depth").innerHTML = rosterDepthTable(data.rosterDepth);
   document.getElementById("draft-picks").innerHTML = scrollWrap(draftPicksTable(data.draftPicks));
-  toggleSection("roster-value-section", "roster-value", data.rosterValue, rosterValueTable, true);
+  toggleSection("roster-value-section", "roster-value", data.rosterValue, rosterValueTable, false);
   currentPointsReport = data.positionPointsReport;
   renderPointsReport();
 
@@ -308,20 +344,29 @@ function toggleSection(sectionId, contentId, dataValue, renderFn, wrapScroll, al
 // change), but keeps the current selection if it's still valid; otherwise
 // defaults to the most recent season, not "All" (mirrors "Standings —
 // Current Season" already defaulting to now).
+// Segmented buttons, not a <select> — a season list is a short, known set
+// (one tap beats opening a dropdown), same reasoning as the jump-nav pills.
+// Overflows into horizontal scroll for leagues with many seasons, same
+// pattern as .jump-nav.
 function populateSeasonFilter(historicalStandings) {
   const seasons = historicalStandings.map((s) => s.season);
   if (!seasonFilterValue || !seasons.includes(seasonFilterValue)) {
     seasonFilterValue = seasons[seasons.length - 1];
   }
 
-  const select = document.getElementById("season-filter");
-  const options = [...seasons].reverse().map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
-  select.innerHTML = `<option value="all">${escapeHtml(t("seasonFilterAll"))}</option>${options}`;
-  select.value = seasonFilterValue;
+  const container = document.getElementById("season-filter");
+  const seasonButtons = [...seasons]
+    .reverse()
+    .map((s) => `<button type="button" class="segmented-btn${s === seasonFilterValue ? " active" : ""}" data-season="${escapeHtml(s)}">${escapeHtml(s)}</button>`)
+    .join("");
+  container.innerHTML = `<button type="button" class="segmented-btn${seasonFilterValue === "all" ? " active" : ""}" data-season="all">${escapeHtml(t("seasonFilterAll"))}</button>${seasonButtons}`;
 }
 
-document.getElementById("season-filter").addEventListener("change", (e) => {
-  seasonFilterValue = e.target.value;
+document.getElementById("season-filter").addEventListener("click", (e) => {
+  const btn = e.target.closest(".segmented-btn");
+  if (!btn) return;
+  seasonFilterValue = btn.dataset.season;
+  document.querySelectorAll("#season-filter .segmented-btn").forEach((b) => b.classList.toggle("active", b === btn));
   renderSeasonScoped();
 });
 
@@ -436,7 +481,20 @@ function rosterDepthTable(rosterDepth) {
     .join("");
 
   const header = `<th></th>${POSITION_COLUMNS.map((p) => `<th scope="col">${p}</th>`).join("")}<th scope="col">${t("colTotal")}</th>`;
-  return `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+  const table = `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+
+  const cards = rosterDepth
+    .map((r) => {
+      const posStats = POSITION_COLUMNS.map((pos) => {
+        const count = r.counts[pos] || 0;
+        const isMax = count > 0 && count === maxByPosition[pos];
+        return mobileStat(pos, count, isMax ? "max" : "");
+      }).join("");
+      return mobileStatCardShell(r.displayName, r.ownerId, posStats + mobileStat(t("colTotal"), r.total));
+    })
+    .join("");
+
+  return scrollWrap(table, "has-mobile-cards") + `<div class="mobile-stat-cards">${cards}</div>`;
 }
 
 // Sorted by total value descending — unlike Roster Depth (count, no natural
@@ -447,10 +505,9 @@ function rosterValueTable(rosterValue) {
   const maxByPosition = Object.fromEntries(
     VALUE_POSITION_COLUMNS.map((pos) => [pos, Math.max(...rosterValue.map((r) => r.byPosition[pos] || 0))])
   );
+  const sorted = rosterValue.slice().sort((a, b) => b.total - a.total);
 
-  const rows = rosterValue
-    .slice()
-    .sort((a, b) => b.total - a.total)
+  const rows = sorted
     .map((r) => {
       const cells = VALUE_POSITION_COLUMNS.map((pos) => {
         const value = r.byPosition[pos] || 0;
@@ -462,11 +519,27 @@ function rosterValueTable(rosterValue) {
     .join("");
 
   const header = `<th></th>${VALUE_POSITION_COLUMNS.map((p) => `<th scope="col">${p}</th>`).join("")}<th scope="col">${t("colTotal")}</th>`;
-  return `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+  const table = `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+
+  const cards = sorted
+    .map((r) => {
+      const posStats = VALUE_POSITION_COLUMNS.map((pos) => {
+        const value = r.byPosition[pos] || 0;
+        const isMax = value > 0 && value === maxByPosition[pos];
+        return mobileStat(pos, value.toLocaleString(), isMax ? "max" : "");
+      }).join("");
+      return mobileStatCardShell(r.displayName, r.ownerId, posStats + mobileStat(t("colTotal"), r.total.toLocaleString()));
+    })
+    .join("");
+
+  return scrollWrap(table, "has-mobile-cards") + `<div class="mobile-stat-cards">${cards}</div>`;
 }
 
 function renderPointsReport() {
-  toggleSection("points-report-section", "points-report", currentPointsReport, pointsReportHtml, true);
+  // false: pointsReportTable() (called inside pointsReportHtml) now wraps
+  // only the table itself, not the scope controls above it — wrapping here
+  // too would double-nest the table in .table-scroll.
+  toggleSection("points-report-section", "points-report", currentPointsReport, pointsReportHtml, false);
 }
 
 function pointsReportHtml(report) {
@@ -486,9 +559,24 @@ function pointsReportHtml(report) {
 const DELTA_DEADZONE = 0.5; // ignore noise this small rather than color-coding every fractional difference
 
 function pointsReportCell(actual, projected) {
-  const delta = actual - projected;
-  const deltaClass = delta > DELTA_DEADZONE ? "power-up" : delta < -DELTA_DEADZONE ? "power-down" : "";
+  const deltaClass = pointsReportDeltaClass(actual, projected);
   return `<td><div class="pp-cell"><span class="pp-actual ${deltaClass}">${actual.toFixed(1)}</span><span class="pp-projected">${t("pointsReportProjected", projected.toFixed(1))}</span></div></td>`;
+}
+
+function pointsReportDeltaClass(actual, projected) {
+  const delta = actual - projected;
+  return delta > DELTA_DEADZONE ? "power-up" : delta < -DELTA_DEADZONE ? "power-down" : "";
+}
+
+// mobileStat's value slot gets the actual/projected pair stacked instead of
+// a single number — same delta color as the table's pp-actual, computed
+// with the same pointsReportDeltaClass so the two views never disagree.
+function pointsReportMobileStat(label, actual, projected) {
+  return `<div class="mobile-stat">
+    <div class="mobile-stat-num ${pointsReportDeltaClass(actual, projected)}">${actual.toFixed(1)}</div>
+    <div class="mobile-stat-label">${escapeHtml(label)}</div>
+    <div class="mobile-stat-proj">${escapeHtml(t("pointsReportProjected", projected.toFixed(1)))}</div>
+  </div>`;
 }
 
 // Sorted by delta (actual minus projected) descending — the point of this
@@ -497,17 +585,18 @@ function pointsReportCell(actual, projected) {
 function pointsReportTable(teams, scope) {
   if (!teams || !teams.length) return `<p class='hint'>${t("noData")}</p>`;
 
-  const withTotals = teams.map((team) => {
-    const byPosition = team[scope];
-    const total = POSITION_COLUMNS.reduce(
-      (acc, pos) => ({ actual: acc.actual + byPosition[pos].actual, projected: acc.projected + byPosition[pos].projected }),
-      { actual: 0, projected: 0 }
-    );
-    return { ownerId: team.ownerId, displayName: team.displayName, byPosition, total };
-  });
+  const withTotals = teams
+    .map((team) => {
+      const byPosition = team[scope];
+      const total = POSITION_COLUMNS.reduce(
+        (acc, pos) => ({ actual: acc.actual + byPosition[pos].actual, projected: acc.projected + byPosition[pos].projected }),
+        { actual: 0, projected: 0 }
+      );
+      return { ownerId: team.ownerId, displayName: team.displayName, byPosition, total };
+    })
+    .sort((a, b) => (b.total.actual - b.total.projected) - (a.total.actual - a.total.projected));
 
   const rows = withTotals
-    .sort((a, b) => (b.total.actual - b.total.projected) - (a.total.actual - a.total.projected))
     .map((team) => {
       const cells = POSITION_COLUMNS.map((pos) => pointsReportCell(team.byPosition[pos].actual, team.byPosition[pos].projected)).join("");
       return `<tr data-owner-id="${escapeHtml(team.ownerId)}"><th scope="row" class="row-label">${escapeHtml(team.displayName)}</th>${cells}${pointsReportCell(team.total.actual, team.total.projected)}</tr>`;
@@ -515,7 +604,16 @@ function pointsReportTable(teams, scope) {
     .join("");
 
   const header = `<th></th>${POSITION_COLUMNS.map((p) => `<th scope="col">${p}</th>`).join("")}<th scope="col">${t("colTotal")}</th>`;
-  return `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+  const table = `<table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
+
+  const cards = withTotals
+    .map((team) => {
+      const posStats = POSITION_COLUMNS.map((pos) => pointsReportMobileStat(pos, team.byPosition[pos].actual, team.byPosition[pos].projected)).join("");
+      return mobileStatCardShell(team.displayName, team.ownerId, posStats + pointsReportMobileStat(t("colTotal"), team.total.actual, team.total.projected));
+    })
+    .join("");
+
+  return scrollWrap(table, "has-mobile-cards") + `<div class="mobile-stat-cards">${cards}</div>`;
 }
 
 document.addEventListener("change", (e) => {
@@ -786,10 +884,12 @@ document.addEventListener("click", async (e) => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t("aiError"));
     // Shareable card reuses the exact payload already sent to the API
-    // (still on hand as `payload`) plus the analysis text — same
-    // "data rides on the trigger button" pattern cards.js uses for every
-    // on-demand AI result.
-    const shareBtnHtml = `<button class="card-trigger-btn card-share-btn" type="button" data-card="tradeVerdict" data-a-name="${escapeHtml(payload.sideA.displayName)}" data-a-players="${escapeHtml(payload.sideA.players)}" data-a-value="${payload.sideA.value}" data-b-name="${escapeHtml(payload.sideB.displayName)}" data-b-players="${escapeHtml(payload.sideB.players)}" data-b-value="${payload.sideB.value}" data-analysis="${escapeHtml(data.analysis)}">${escapeHtml(t("share"))}</button>`;
+    // (still on hand as `payload`) plus a card-length summary — Claude
+    // writes that summary in the same call (see lib/claude.js), purpose-
+    // built to be short, rather than the card truncating the full analysis.
+    // Falls back to the full analysis (CSS line-clamped) on the rare
+    // request where Claude didn't return clean JSON and summary is null.
+    const shareBtnHtml = `<button class="card-trigger-btn card-share-btn" type="button" data-card="tradeVerdict" data-a-name="${escapeHtml(payload.sideA.displayName)}" data-a-players="${escapeHtml(payload.sideA.players)}" data-a-value="${payload.sideA.value}" data-b-name="${escapeHtml(payload.sideB.displayName)}" data-b-players="${escapeHtml(payload.sideB.players)}" data-b-value="${payload.sideB.value}" data-summary="${escapeHtml(data.summary || data.analysis)}">${escapeHtml(t("share"))}</button>`;
     resultEl.innerHTML = `<p>${escapeHtml(data.analysis)}</p>${shareBtnHtml}`;
     btn.remove();
   } catch (err) {
@@ -801,9 +901,30 @@ document.addEventListener("click", async (e) => {
 
 // Every table on a phone-width screen can still overflow (long names, many
 // columns) — scope the horizontal scroll to the table itself instead of
-// letting it blow out the whole page layout.
-function scrollWrap(tableHtml) {
-  return `<div class="table-scroll">${tableHtml}</div>`;
+// letting it blow out the whole page layout. extraClass is only used by the
+// 3 wide tables that also render a stacked-card alternative for mobile (see
+// mobileStat/mobileStatCardShell below) — "has-mobile-cards" is what
+// style.css hides at <480px in favor of that alternative.
+function scrollWrap(tableHtml, extraClass = "") {
+  return `<div class="table-scroll ${extraClass}">${tableHtml}</div>`;
+}
+
+// One card per manager, replacing a wide position/value grid on phones —
+// same data as the table it sits beside, just shaped for a thumb instead of
+// a horizontal scrollbar. Only Roster Depth/Value/Points Report get this
+// (see each table function below): GOAT/H2H stay tables at every size
+// because they're comparison-first (scanning a column), and the existing
+// tap-to-share-card behavior already gives mobile a reason to stay in table
+// form there.
+function mobileStat(label, value, extraClass = "") {
+  return `<div class="mobile-stat"><div class="mobile-stat-num ${extraClass}">${value}</div><div class="mobile-stat-label">${escapeHtml(label)}</div></div>`;
+}
+
+function mobileStatCardShell(displayName, ownerId, statsHtml) {
+  return `<div class="mobile-stat-card" data-owner-id="${escapeHtml(ownerId)}">
+    <div class="mobile-stat-card-name">${escapeHtml(displayName)}</div>
+    <div class="mobile-stat-grid">${statsHtml}</div>
+  </div>`;
 }
 
 function standingsTable(standings) {

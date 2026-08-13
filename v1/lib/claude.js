@@ -15,6 +15,11 @@ function cacheKey(trade, lang) {
   return `${trade.season}:${trade.week}:${trade.sideA.displayName}:${trade.sideB.displayName}:${lang}`;
 }
 
+// Asks for the full analysis AND a card-length summary in the same call —
+// cheaper and more honest than trying to fit the full 3-4 sentence analysis
+// into a fixed-size shareable card via CSS truncation/line-clamp. The card
+// gets copy actually written to be short, not a clipped version of longer
+// prose.
 function buildPrompt({ season, week, sideA, sideB }, lang) {
   if (lang === "es") {
     return `Eres un analista de fantasy football escribiendo para los managers de una liga dinasty. Analiza este trade real de la temporada ${season}, semana ${week}:
@@ -22,14 +27,24 @@ function buildPrompt({ season, week, sideA, sideB }, lang) {
 ${sideA.displayName} recibió: ${sideA.players} (produjeron ${sideA.value.toFixed(1)} puntos fantasy después del trade)
 ${sideB.displayName} recibió: ${sideB.players} (produjeron ${sideB.value.toFixed(1)} puntos fantasy después del trade)
 
-Escribe un análisis breve (3-4 oraciones) en español, en tono de comentarista deportivo, evaluando quién ganó el trade y por qué, basándote SOLO en los puntos producidos que te di. Si alguno de los dos lados incluye un pick de draft o FAAB (no un jugador), acláralo — esos puntos de producción no aplican a ese elemento, solo a los jugadores. No inventes lesiones, contexto ni datos que no aparecen arriba. No uses encabezados ni markdown, solo texto plano.`;
+Basándote SOLO en los puntos producidos que te di (si alguno de los dos lados incluye un pick de draft o FAAB, no un jugador, acláralo — esos puntos no aplican a ese elemento). No inventes lesiones, contexto ni datos que no aparecen arriba.
+
+Responde ÚNICAMENTE con un objeto JSON válido, sin markdown ni texto adicional, con esta forma exacta:
+{"analysis": "<3-4 oraciones en español, tono de comentarista deportivo, evaluando quién ganó y por qué>", "summary": "<una sola oración corta y directa, menos de 100 caracteres, para una card compartible — el titular del análisis, no un resumen genérico>"}
+
+Ambos campos van en español, sin encabezados ni markdown, solo texto plano.`;
   }
   return `You are a fantasy football analyst writing for the managers of a dynasty league. Analyze this real trade from the ${season} season, week ${week}:
 
 ${sideA.displayName} received: ${sideA.players} (produced ${sideA.value.toFixed(1)} fantasy points after the trade)
 ${sideB.displayName} received: ${sideB.players} (produced ${sideB.value.toFixed(1)} fantasy points after the trade)
 
-Write a brief analysis (3-4 sentences) in English, in a sports-commentator tone, evaluating who won the trade and why, based ONLY on the points given above. If either side includes a draft pick or FAAB (not a player), call that out — the points production number doesn't apply to it, only to the players. Don't invent injuries, context, or data not shown above. No headers or markdown, plain text only.`;
+Based ONLY on the points given above (if either side includes a draft pick or FAAB, not a player, call that out — the points number doesn't apply to it). Don't invent injuries, context, or data not shown above.
+
+Respond ONLY with a valid JSON object, no markdown or extra text, in exactly this shape:
+{"analysis": "<3-4 sentences in English, sports-commentator tone, evaluating who won and why>", "summary": "<one short, punchy sentence, under 100 characters, for a shareable card — the headline of the analysis, not a generic summary>"}
+
+Both fields are in English, no headers or markdown, plain text only.`;
 }
 
 export async function analyzeTrade(trade, lang = "en") {
@@ -43,13 +58,29 @@ export async function analyzeTrade(trade, lang = "en") {
 
   const response = await anthropic.messages.create({
     model: "claude-haiku-4-5",
-    max_tokens: 300,
+    max_tokens: 350,
     messages: [{ role: "user", content: buildPrompt(trade, lang) }],
   });
 
   const text = response.content.find((block) => block.type === "text")?.text?.trim() || "";
-  analysisCache.set(key, text);
-  return text;
+  const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+
+  let result;
+  try {
+    const parsed = JSON.parse(jsonText);
+    result = {
+      analysis: typeof parsed.analysis === "string" ? parsed.analysis : text,
+      summary: typeof parsed.summary === "string" ? parsed.summary : null,
+    };
+  } catch {
+    // Claude didn't return clean JSON — degrade to the raw text as the
+    // analysis with no summary; the card falls back to line-clamping that
+    // instead, same safety net as before.
+    result = { analysis: text, summary: null };
+  }
+
+  analysisCache.set(key, result);
+  return result;
 }
 
 // ---- Trade Analyzer (hypothetical, not-yet-made trades) -------------------
@@ -92,9 +123,9 @@ function buildSimulatePrompt({ offerTeam, requestTeam }, lang) {
           instructions: `Evalúa el trade usando SOLO estos tres factores: (1) el valor dynasty de cada lado, (2) los puntos por partido de esta temporada de cada jugador, y (3) si cada lado le ayuda al roster receptor en una posición donde tiene necesidad, o si le sobra profundidad ahí. No inventes lesiones, contexto ni datos que no aparecen arriba.
 
 Responde ÚNICAMENTE con un objeto JSON válido, sin markdown ni texto adicional, con esta forma exacta:
-{"verdict": "<una de: steal_for_you, win_for_you, fair, win_for_them, steal_for_them>", "interpretation": "<3-4 oraciones en español, tono de comentarista deportivo, explicando el veredicto>"}
+{"verdict": "<una de: steal_for_you, win_for_you, fair, win_for_them, steal_for_them>", "interpretation": "<3-4 oraciones en español, tono de comentarista deportivo, explicando el veredicto>", "summary": "<una sola oración corta y directa, menos de 100 caracteres, para una card compartible>"}
 
-"verdict" es SIEMPRE una de esas 5 claves en inglés exactas (no las traduzcas), evaluado desde el punto de vista de "${offerTeam.displayName}" (quien ofrece). "interpretation" va en español.`,
+"verdict" es SIEMPRE una de esas 5 claves en inglés exactas (no las traduzcas), evaluado desde el punto de vista de "${offerTeam.displayName}" (quien ofrece). "interpretation" y "summary" van en español.`,
         }
       : {
           intro: `You are a dynasty fantasy football analyst helping a manager evaluate a PROPOSED trade that has NOT happened yet — this is hypothetical, not a completed deal.`,
@@ -105,9 +136,9 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin markdown ni texto adicional
           instructions: `Evaluate the trade using ONLY these three factors: (1) each side's dynasty trade value, (2) each player's points-per-game this season, and (3) whether each side helps the receiving roster at a position of need, or adds to a position they're already deep at. Don't invent injuries, context, or data not shown above.
 
 Respond ONLY with a valid JSON object, no markdown or extra text, in exactly this shape:
-{"verdict": "<one of: steal_for_you, win_for_you, fair, win_for_them, steal_for_them>", "interpretation": "<3-4 sentences in English, sports-commentator tone, explaining the verdict>"}
+{"verdict": "<one of: steal_for_you, win_for_you, fair, win_for_them, steal_for_them>", "interpretation": "<3-4 sentences in English, sports-commentator tone, explaining the verdict>", "summary": "<one short, punchy sentence, under 100 characters, for a shareable card>"}
 
-"verdict" is ALWAYS one of those 5 exact English keys, evaluated from "${offerTeam.displayName}"'s (the offering side's) point of view. "interpretation" is in English.`,
+"verdict" is ALWAYS one of those 5 exact English keys, evaluated from "${offerTeam.displayName}"'s (the offering side's) point of view. "interpretation" and "summary" are in English.`,
         };
 
   return `${shared.intro}
@@ -183,9 +214,9 @@ function buildRoastPrompt({ displayName, players, rosterCounts, netPicks, gained
           }
 
 Responde ÚNICAMENTE con un objeto JSON válido, sin markdown ni texto adicional, con esta forma exacta:
-{"grade": "<una letra: A, B, C, D, o F>", "roast": "<3-5 oraciones en español, tono de roast divertido pero fundamentado en los datos>", "suggestions": ["<sugerencia concreta 1>", "<sugerencia concreta 2>", "<sugerencia concreta 3>"]}
+{"grade": "<una letra: A, B, C, D, o F>", "roast": "<3-5 oraciones en español, tono de roast divertido pero fundamentado en los datos>", "suggestions": ["<sugerencia concreta 1>", "<sugerencia concreta 2>", "<sugerencia concreta 3>"], "summary": "<una sola oración corta y filosa, menos de 100 caracteres, para una card compartible — el titular del roast, no un resumen genérico>"}
 
-"grade" es SIEMPRE una letra exacta en inglés (A/B/C/D/F, no la traduzcas). "roast" y "suggestions" van en español. Las sugerencias deben ser accionables (ej. "tradea a X mientras su valor está alto", "usa tu pick extra de 2027 para llenar RB", "ofrécele a [Equipo] tu exceso de WR a cambio de [Jugador real de ellos], que está enterrado en su banca").`,
+"grade" es SIEMPRE una letra exacta en inglés (A/B/C/D/F, no la traduzcas). "roast", "suggestions" y "summary" van en español. Las sugerencias deben ser accionables (ej. "tradea a X mientras su valor está alto", "usa tu pick extra de 2027 para llenar RB", "ofrécele a [Equipo] tu exceso de WR a cambio de [Jugador real de ellos], que está enterrado en su banca").`,
         }
       : {
           intro: `You are a dynasty fantasy football commentator giving a fun, savage "roast" of a manager's CURRENT roster for their league group chat — this is entertainment among friends, not a serious analysis or a personal insult.`,
@@ -200,9 +231,9 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin markdown ni texto adicional
           }
 
 Respond ONLY with a valid JSON object, no markdown or extra text, in exactly this shape:
-{"grade": "<one letter: A, B, C, D, or F>", "roast": "<3-5 sentences in English, fun roast tone but grounded in the data>", "suggestions": ["<concrete suggestion 1>", "<concrete suggestion 2>", "<concrete suggestion 3>"]}
+{"grade": "<one letter: A, B, C, D, or F>", "roast": "<3-5 sentences in English, fun roast tone but grounded in the data>", "suggestions": ["<concrete suggestion 1>", "<concrete suggestion 2>", "<concrete suggestion 3>"], "summary": "<one short, sharp sentence, under 100 characters, for a shareable card — the headline of the roast, not a generic summary>"}
 
-"grade" is ALWAYS one exact letter (A/B/C/D/F). "roast" and "suggestions" are in English. Suggestions should be actionable (e.g. "trade X while their value is high", "use your extra 2027 pick to address RB", "offer [Team] your extra WR depth for [their real player], who's buried on their bench").`,
+"grade" is ALWAYS one exact letter (A/B/C/D/F). "roast", "suggestions", and "summary" are in English. Suggestions should be actionable (e.g. "trade X while their value is high", "use your extra 2027 pick to address RB", "offer [Team] your extra WR depth for [their real player], who's buried on their bench").`,
         };
 
   const otherTeamsBlock = leagueTeams?.length ? `\n\n${shared.otherTeams}:\n${formatLeagueTeams(leagueTeams, lang)}` : "";
@@ -243,9 +274,10 @@ export async function roastTeam(team, lang = "en") {
       grade: VALID_GRADES.has(parsed.grade) ? parsed.grade : "C",
       roast: typeof parsed.roast === "string" ? parsed.roast : text,
       suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((s) => typeof s === "string").slice(0, 4) : [],
+      summary: typeof parsed.summary === "string" ? parsed.summary : null,
     };
   } catch {
-    result = { grade: "C", roast: text, suggestions: [] };
+    result = { grade: "C", roast: text, suggestions: [], summary: null };
   }
 
   roastCache.set(key, result);
@@ -279,11 +311,12 @@ export async function simulateTradeAnalysis(trade, lang = "en") {
     result = {
       verdict: VALID_VERDICTS.has(parsed.verdict) ? parsed.verdict : "fair",
       interpretation: typeof parsed.interpretation === "string" ? parsed.interpretation : text,
+      summary: typeof parsed.summary === "string" ? parsed.summary : null,
     };
   } catch {
     // Claude didn't return clean JSON — degrade gracefully rather than
     // failing the request, same ethos as the rest of the project.
-    result = { verdict: "fair", interpretation: text };
+    result = { verdict: "fair", interpretation: text, summary: null };
   }
 
   simulationCache.set(key, result);

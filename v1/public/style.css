@@ -214,16 +214,82 @@ section h2 { margin-top: 0; }
 }
 .section-group-header::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
-.season-filter-bar { display: flex; align-items: center; gap: 10px; margin: 4px 4px 20px; font-size: 14px; }
+/* Sticky jump-nav — the 3 group dividers above, promoted to a control you
+   can actually tap instead of scrolling past. Sticks to the viewport top
+   once you scroll past the header/form (position:sticky, no JS needed for
+   the stickiness itself — app.js only handles scroll-to + active state).
+   Own background so content doesn't show through while scrolling under it. */
+.jump-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+  padding: 10px 0;
+  margin: 0 0 8px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.jump-nav::-webkit-scrollbar { display: none; }
+.jump-pill {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.jump-pill:hover { color: var(--text); border-color: var(--muted); opacity: 1; }
+.jump-pill.active { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
+
+.season-filter-bar { margin: 4px 4px 20px; }
 .transaction-history-search { margin: 4px 0 16px; }
 
-/* Shared control style for every standalone <select> in the app (season
-   filter, trade tracker search, my team, points report scope, trade
-   analyzer team pickers) — one definition instead of the same declarations
-   repeated per section, so hover/disabled only need to be written once. */
+/* Segmented season filter — a grouped pill control (one bordered strip,
+   segments share it) rather than separate free-floating pills like
+   .jump-nav, so it reads as "one control with options" instead of "a row of
+   buttons." Scrolls horizontally instead of wrapping for leagues with many
+   seasons, same overflow pattern as .jump-nav. */
+.segmented-filter {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.segmented-filter::-webkit-scrollbar { display: none; }
+.segmented-btn {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.segmented-btn:hover:not(.active) { color: var(--text); opacity: 1; }
+.segmented-btn.active { background: var(--accent); color: var(--accent-contrast); }
+
+/* Shared control style for every standalone <select> in the app (my team,
+   points report scope, transaction history search, trade history AI, roast
+   team picker, trade analyzer team pickers) — one definition instead of the
+   same declarations repeated per section, so hover/disabled only need to be
+   written once. Pill radius (not --radius-control) so every select reads as
+   the same control family as .jump-nav/.segmented-btn/.card-trigger-btn. */
 select {
-  padding: 8px 12px;
-  border-radius: var(--radius-control);
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
@@ -268,6 +334,23 @@ table tr:hover:not(.goat-row):not(.is-me) { background: rgba(0, 196, 106, 0.05);
 /* A table only scrolls within its own box, never the whole page. */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .table-scroll table { min-width: max-content; }
+
+/* Mobile alternative to a wide grid table — Roster Depth/Value and Points
+   Report render both this AND their .table-scroll table (see app.js); the
+   media query below shows one or the other by width. GOAT/H2H/standings
+   stay tables at every size on purpose (comparison-first, and already have
+   a reason to be tables — tap-to-share). Hidden by default; the media query
+   at the bottom of this file swaps it in under 480px. */
+.mobile-stat-cards { display: none; }
+.mobile-stat-card { border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px 14px; margin-bottom: 10px; }
+.mobile-stat-card:last-child { margin-bottom: 0; }
+.mobile-stat-card-name { font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+.mobile-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 8px; }
+.mobile-stat { text-align: center; }
+.mobile-stat-num { font-size: 16px; font-weight: 800; }
+.mobile-stat-num.max { color: var(--accent-text); }
+.mobile-stat-label { font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 2px; }
+.mobile-stat-proj { font-size: 9px; color: var(--muted); margin-top: 1px; }
 
 /* GOAT hero card — the headline stat gets a different visual weight than a
    plain table row. Part of the "accent callout" family together with
@@ -643,7 +726,30 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
 .ai-card .safe-top { height: 60px; flex-shrink: 0; }
 .ai-card .safe-bottom { height: 52px; flex-shrink: 0; }
 .ai-body { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0 24px; text-align: center; min-height: 0; }
-.ai-kicker { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--accent); }
+
+/* Line-clamping, not character-counting, is what actually bounds AI text to
+   .ai-body's fixed height — a character cap only approximates how many
+   characters fit a line (word lengths vary), so it either clips mid-line
+   anyway or wastes space. Clamping by real rendered lines is exact
+   regardless of content, and overflow-wrap covers the one case clamp alone
+   doesn't (a single unbroken "word" longer than the box, e.g. a URL-like
+   string) by forcing it to break instead of overflowing sideways. Every
+   clamp value below is sized so the WORST case (every text block maxed out
+   at once) still fits inside .ai-body's ~457px budget (569px card minus
+   60px/52px safe zones) — see each card-building function in cards.js for
+   the line-by-line math this was checked against. */
+.ai-kicker,
+.ai-text,
+.ai-card-name,
+.vs-name,
+.vs-players,
+.todo-item-text {
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ai-kicker { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--accent); -webkit-line-clamp: 1; line-clamp: 1; }
 .ai-hypo-tag {
   margin-top: 6px;
   font-size: 9px;
@@ -656,11 +762,11 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
   padding: 3px 10px;
 }
 .ai-divider { width: 34px; height: 2px; background: var(--border); border-radius: 2px; margin: 16px 0; flex-shrink: 0; }
-.ai-text { font-size: 13.5px; line-height: 1.6; color: #c7cad1; max-width: 258px; }
+.ai-text { font-size: 13.5px; line-height: 1.6; color: #c7cad1; max-width: 258px; -webkit-line-clamp: 6; line-clamp: 6; }
 .ai-footer { text-align: center; font-size: 10px; letter-spacing: 0.03em; color: #5b6068; padding-bottom: 4px; }
 
 /* Roast: grade ring hero + "what to do" box */
-.ai-card-name { font-size: 18px; font-weight: 700; margin-top: 8px; }
+.ai-card-name { font-size: 18px; font-weight: 700; margin-top: 8px; -webkit-line-clamp: 1; line-clamp: 1; }
 .grade-ring {
   width: 96px;
   height: 96px;
@@ -686,16 +792,20 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
   flex-shrink: 0;
 }
 .todo-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+/* .todo-item stays a flex row (arrow + text) — display:-webkit-box for
+   clamping can't live on the same element as display:flex, so the clamp
+   goes on the .todo-item-text child instead. */
 .todo-item { font-size: 12px; line-height: 1.5; color: #d8dae0; display: flex; gap: 7px; }
 .todo-item::before { content: "→"; color: var(--accent); flex-shrink: 0; }
+.todo-item-text { -webkit-line-clamp: 1; line-clamp: 1; }
 .todo-item + .todo-item { margin-top: 4px; }
 
 /* Trade Verdict / Trade Analyzer: head-to-head comparison block, same "VS"
    idea as .stat-card-vs but two-sided with a value/players line per side. */
 .vs-row { display: flex; align-items: flex-start; justify-content: center; gap: 14px; width: 100%; margin-top: 14px; }
 .vs-side { flex: 1; min-width: 0; }
-.vs-name { font-size: 13.5px; font-weight: 700; margin-bottom: 4px; }
-.vs-players { font-size: 11.5px; color: #9a9ea6; line-height: 1.4; min-height: 32px; }
+.vs-name { font-size: 13.5px; font-weight: 700; margin-bottom: 4px; -webkit-line-clamp: 1; line-clamp: 1; }
+.vs-players { font-size: 11.5px; color: #9a9ea6; line-height: 1.4; min-height: 32px; -webkit-line-clamp: 2; line-clamp: 2; }
 .vs-value { font-size: 15px; font-weight: 800; margin-top: 6px; color: #d8dae0; }
 .vs-side.winner .vs-value { color: var(--accent); }
 .vs-crown { font-size: 13px; margin-bottom: 2px; min-height: 15px; }
@@ -939,4 +1049,6 @@ th.is-me { color: var(--accent-text); }
   h1 { font-size: 22px; }
   .stat-card { width: 280px; height: 280px; padding: 20px; }
   .lang-toggle { position: static; justify-content: center; margin-bottom: 12px; }
+  .table-scroll.has-mobile-cards { display: none; }
+  .mobile-stat-cards { display: block; }
 }
