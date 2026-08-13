@@ -9,6 +9,12 @@ let activeLeagueId = null;
 let turnstileToken = null; // set by onTurnstileSuccess (Cloudflare Turnstile, index.html) — sent as X-Turnstile-Token on the first request; the server's response cookie covers every later one in the session
 let allTransactions = []; // full transactionHistory list from the last load — renderTransactionHistory() filters/slices from this, no re-fetch needed
 const TRANSACTION_HISTORY_LIMIT = 5;
+let allHistoricalTrades = []; // every trade-type event from allTransactions, unfiltered — backs the "Who Won This Trade?" select, unlike Transaction History which caps at 5
+const tradeHistoryAiSelect = document.getElementById("trade-history-ai-select");
+tradeHistoryAiSelect.addEventListener("change", () => {
+  const index = tradeHistoryAiSelect.value;
+  document.getElementById("trade-history-ai-detail").innerHTML = index === "" ? "" : tradeHistoryAiDetailHtml(allHistoricalTrades[index]);
+});
 const transactionHistorySelect = document.getElementById("transaction-history-select");
 // Independent from "Mi equipo" (that selector answers "who am I" and drives
 // highlighting across the whole page); this one only answers "whose
@@ -98,9 +104,11 @@ async function loadLeague(leagueId) {
     if (window.initCards) window.initCards(data);
     if (window.initMyTeam) window.initMyTeam(data, leagueId);
     if (window.initTradeAnalyzer) window.initTradeAnalyzer(data, leagueId);
+    if (window.initRoast) window.initRoast(data);
     statusEl.textContent = "";
     results.hidden = false;
     maybeShowCoachmark();
+    maybeShowScrollHint();
   } catch (err) {
     statusEl.textContent = "⚠️ " + err.message;
   }
@@ -126,6 +134,30 @@ document.getElementById("coachmark-dismiss").addEventListener("click", dismissCo
 document.addEventListener("click", (e) => {
   if (!coachmarkEl.hidden && e.target.closest("[data-card]")) dismissCoachmark();
 });
+
+// Shown once, the first time results ever render for this browser — a
+// bottom-fixed bouncing pill nudging first-time visitors to scroll past the
+// fold, since the page opens on the (short) League ID form with no visual
+// cue that a full report is waiting below. Dismissed by the first scroll
+// (the thing it's telling them to do), a tap on it, or a timeout fallback
+// so it never lingers indefinitely for someone who does neither.
+const SCROLL_HINT_SEEN_KEY = "fli:scrollHintSeen";
+const scrollHintEl = document.getElementById("scroll-hint");
+let scrollHintTimer = null;
+
+function maybeShowScrollHint() {
+  if (localStorage.getItem(SCROLL_HINT_SEEN_KEY)) return;
+  scrollHintEl.hidden = false;
+  window.addEventListener("scroll", dismissScrollHint, { once: true });
+  scrollHintEl.addEventListener("click", dismissScrollHint, { once: true });
+  scrollHintTimer = setTimeout(dismissScrollHint, 6000);
+}
+
+function dismissScrollHint() {
+  scrollHintEl.hidden = true;
+  clearTimeout(scrollHintTimer);
+  localStorage.setItem(SCROLL_HINT_SEEN_KEY, "1");
+}
 
 function render(data) {
   currentLeagueData = data;
@@ -172,6 +204,46 @@ function render(data) {
     .join("");
   transactionHistorySelect.innerHTML = `<option value="">${escapeHtml(t("transactionHistorySearchPlaceholder"))}</option>${options}`;
   renderTransactionHistory(null, null);
+
+  allHistoricalTrades = allTransactions.filter((e) => e.type === "trade");
+  document.getElementById("trade-history-ai-section").hidden = allHistoricalTrades.length === 0;
+  const tradeOptions = allHistoricalTrades
+    .map(
+      (trade, i) =>
+        `<option value="${i}">${escapeHtml(t("tradeHistoryAiOption", trade.season, trade.week, trade.sideA.displayName, trade.sideB.displayName))}</option>`
+    )
+    .join("");
+  tradeHistoryAiSelect.innerHTML = `<option value="">${escapeHtml(t("tradeHistoryAiPlaceholder"))}</option>${tradeOptions}`;
+  document.getElementById("trade-history-ai-detail").innerHTML = "";
+}
+
+// Same shell as a Transaction History trade row (trade-sides + AI button),
+// reused directly since the document-level .ai-analyze-btn click listener
+// (see the delegated listener near transactionRowHtml below) reads its
+// payload from data-* attributes alone — it doesn't care which section the
+// button lives in, so no new wiring is needed here.
+function tradeHistoryAiDetailHtml(trade) {
+  return `
+    <div class="trade-sides">
+      <div class="trade-side"><b>${escapeHtml(trade.sideA.displayName)}</b> ${t("tradeTrackerReceived")} ${escapeHtml(trade.sideA.players)}</div>
+      <div class="trade-vs">⇄</div>
+      <div class="trade-side"><b>${escapeHtml(trade.sideB.displayName)}</b> ${t("tradeTrackerReceived")} ${escapeHtml(trade.sideB.players)}</div>
+    </div>
+    <div class="trade-ai">
+      <button
+        class="ai-analyze-btn"
+        type="button"
+        data-season="${escapeHtml(trade.season)}"
+        data-week="${trade.week}"
+        data-side-a-name="${escapeHtml(trade.sideA.displayName)}"
+        data-side-a-players="${escapeHtml(trade.sideA.players)}"
+        data-side-a-value="${trade.sideA.value}"
+        data-side-b-name="${escapeHtml(trade.sideB.displayName)}"
+        data-side-b-players="${escapeHtml(trade.sideB.players)}"
+        data-side-b-value="${trade.sideB.value}"
+      >${t("aiAnalyzeBtn")}</button>
+      <div class="ai-result" hidden></div>
+    </div>`;
 }
 
 // An event "involves" a manager if they're on either side of a trade, or
@@ -713,7 +785,12 @@ document.addEventListener("click", async (e) => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t("aiError"));
-    resultEl.textContent = data.analysis;
+    // Shareable card reuses the exact payload already sent to the API
+    // (still on hand as `payload`) plus the analysis text — same
+    // "data rides on the trigger button" pattern cards.js uses for every
+    // on-demand AI result.
+    const shareBtnHtml = `<button class="card-trigger-btn card-share-btn" type="button" data-card="tradeVerdict" data-a-name="${escapeHtml(payload.sideA.displayName)}" data-a-players="${escapeHtml(payload.sideA.players)}" data-a-value="${payload.sideA.value}" data-b-name="${escapeHtml(payload.sideB.displayName)}" data-b-players="${escapeHtml(payload.sideB.players)}" data-b-value="${payload.sideB.value}" data-analysis="${escapeHtml(data.analysis)}">${escapeHtml(t("share"))}</button>`;
+    resultEl.innerHTML = `<p>${escapeHtml(data.analysis)}</p>${shareBtnHtml}`;
     btn.remove();
   } catch (err) {
     resultEl.textContent = err.message || t("aiError");

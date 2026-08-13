@@ -23,7 +23,7 @@ import {
   computePositionPointsReport,
   computeRosterPlayerPool,
 } from "./lib/sleeper.js";
-import { analyzeTrade, simulateTradeAnalysis } from "./lib/claude.js";
+import { analyzeTrade, simulateTradeAnalysis, roastTeam } from "./lib/claude.js";
 import { checkTurnstile } from "./lib/turnstile.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -243,6 +243,82 @@ app.post("/api/trade-simulate", async (req, res) => {
 
   try {
     const result = await simulateTradeAnalysis({ offerTeam, requestTeam }, lang);
+    res.json(result);
+  } catch (err) {
+    if (err.message === "AI_NOT_CONFIGURED") {
+      return res.status(503).json({ error: errors.notConfigured });
+    }
+    console.error(err);
+    res.status(500).json({ error: errors.failed + err.message });
+  }
+});
+
+// Roast My Team — grades and roasts a manager's CURRENT roster (backlog
+// item, not a hypothetical trade). Reuses isValidPickedPlayer for the
+// player shape; rosterCounts/netPicks/gained/lost mirror what
+// computeRosterDepth/computeDraftPickCapital already return, validated the
+// same "don't trust the client, this hits Claude directly" way as the other
+// two AI endpoints above.
+function isValidPickTrade(p) {
+  return p && typeof p.season === "string" && p.season.length <= 10 && Number.isInteger(p.round) && p.round >= 1 && p.round <= 30;
+}
+
+function isValidRoastTeam(team) {
+  return (
+    team &&
+    typeof team.displayName === "string" &&
+    team.displayName.length <= 100 &&
+    Array.isArray(team.players) &&
+    team.players.length >= 1 &&
+    team.players.length <= 40 &&
+    team.players.every(isValidPickedPlayer) &&
+    team.rosterCounts &&
+    typeof team.rosterCounts === "object" &&
+    Object.values(team.rosterCounts).every((n) => Number.isInteger(n) && n >= 0) &&
+    Number.isInteger(team.netPicks) &&
+    Array.isArray(team.gained) &&
+    team.gained.length <= 50 &&
+    team.gained.every(isValidPickTrade) &&
+    Array.isArray(team.lost) &&
+    team.lost.length <= 50 &&
+    team.lost.every(isValidPickTrade)
+  );
+}
+
+// Other rosters in the league, passed alongside the roasted team so Claude
+// can suggest a real trade partner instead of inventing one — trimmed
+// client-side to each team's top players (see roast.js), so this validator
+// caps well below the isValidRoastTeam limits above.
+function isValidLeagueTeam(t) {
+  return (
+    t &&
+    typeof t.displayName === "string" &&
+    t.displayName.length <= 100 &&
+    Array.isArray(t.topPlayers) &&
+    t.topPlayers.length <= 15 &&
+    t.topPlayers.every(isValidPickedPlayer) &&
+    t.rosterCounts &&
+    typeof t.rosterCounts === "object" &&
+    Object.values(t.rosterCounts).every((n) => Number.isInteger(n) && n >= 0) &&
+    Number.isInteger(t.netPicks)
+  );
+}
+
+app.post("/api/roast-team", async (req, res) => {
+  const lang = req.body?.lang === "es" ? "es" : "en";
+  const errors = {
+    en: { badRequest: "Invalid team data.", notConfigured: "AI analysis isn't configured for this deployment.", failed: "Couldn't generate the roast. " },
+    es: { badRequest: "Datos de equipo inválidos.", notConfigured: "El análisis con IA no está configurado en este deployment.", failed: "No se pudo generar el roast. " },
+  }[lang];
+
+  const { displayName, players, rosterCounts, netPicks, gained, lost, leagueTeams } = req.body || {};
+  const validLeagueTeams = leagueTeams === undefined || (Array.isArray(leagueTeams) && leagueTeams.length <= 30 && leagueTeams.every(isValidLeagueTeam));
+  if (!isValidRoastTeam({ displayName, players, rosterCounts, netPicks, gained, lost }) || !validLeagueTeams) {
+    return res.status(400).json({ error: errors.badRequest });
+  }
+
+  try {
+    const result = await roastTeam({ displayName, players, rosterCounts, netPicks, gained, lost, leagueTeams }, lang);
     res.json(result);
   } catch (err) {
     if (err.message === "AI_NOT_CONFIGURED") {

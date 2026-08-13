@@ -117,6 +117,19 @@ function buildCardHtml(ds) {
       return narrativeCardHtml({ icon: ds.icon, title: ds.title, headline: ds.headline, detail: ds.detail }, leagueName);
     case "week":
       return currentData.weekRecap ? weekCardHtml(currentData.weekRecap, leagueName) : null;
+    // The three AI-analysis cards below all follow the same "data rides on
+    // the trigger button" pattern as "personal" above — each is an on-demand
+    // AI result (roast.js / the trade-analysis and trade-simulate click
+    // handlers in app.js/tradeAnalyzer.js), not part of the league payload,
+    // so there's no currentData index to look up.
+    case "roast": {
+      const suggestions = (ds.suggestions || "").split(" ||| ").filter(Boolean);
+      return roastCardHtml(ds.displayName, ds.grade, ds.roast, suggestions, leagueName);
+    }
+    case "tradeVerdict":
+      return tradeVerdictCardHtml(ds, leagueName);
+    case "tradeAnalyzer":
+      return tradeAnalyzerCardHtml(ds, leagueName);
     default:
       return null;
   }
@@ -203,6 +216,120 @@ function seasonCardHtml(seasonEntry, leagueName) {
   `);
 }
 
+// Shared shell for the three AI-analysis cards (Roast, Trade Verdict, Trade
+// Analyzer) — same 9:16 shape/safe-zones/footer as each other, only the
+// middle content and the accent-color modifier differ. See style.css's
+// .ai-card block for why this is a different shape from cardShell()'s
+// square .stat-card (these pack more content than a single stat).
+function aiCardShell(bodyHtml, extraClass = "") {
+  return `<div class="ai-card ${extraClass}">
+    <div class="safe-top"></div>
+    <div class="ai-body">${bodyHtml}</div>
+    <div class="safe-bottom"><div class="ai-footer">🏈 www.storyofmyleague.com</div></div>
+  </div>`;
+}
+
+// The AI-card body (see .ai-body's fixed height in style.css) has a hard
+// pixel budget, not an unlimited scroll area like the inline result — AI
+// text has no length guarantee, so it gets cut off by .ai-card's
+// overflow:hidden once it runs long. Truncating before render (rather than
+// relying on overflow:hidden alone) keeps the card looking intentional —
+// "…" at a clean boundary instead of a sentence sliced mid-word at the
+// card's bottom edge. Budgets are conservative estimates for a 9:16 card at
+// these font sizes, not exact pixel math — the AI's real output usually
+// runs under the cap anyway (the prompts already ask for short copy).
+function truncate(str, max) {
+  if (!str || str.length <= max) return str || "";
+  return str.slice(0, max - 1).trimEnd() + "…";
+}
+
+// D/F grade -> red (bad), C -> amber (warn), A/B -> default green (good).
+function gradeCardClass(grade) {
+  if (grade === "D" || grade === "F") return "ai-card--bad";
+  if (grade === "C") return "ai-card--warn";
+  return "";
+}
+
+// Same 5-key verdict Trade Analyzer already colors inline via .verdict-badge
+// — reused here as a 3-tier read (good/fair/bad) for the card's accent.
+function verdictCardClass(verdict) {
+  if (verdict === "win_for_them" || verdict === "steal_for_them") return "ai-card--bad";
+  if (verdict === "fair") return "ai-card--neutral";
+  return "";
+}
+
+function roastCardHtml(displayName, grade, roast, suggestions, leagueName) {
+  const todoHtml = suggestions.length
+    ? `<div class="todo-box">
+        <div class="todo-label">${escapeHtml(t("roastSuggestionsTitle"))}</div>
+        ${suggestions.slice(0, 2).map((s) => `<div class="todo-item">${escapeHtml(truncate(s, 40))}</div>`).join("")}
+      </div>`
+    : "";
+  return aiCardShell(
+    `
+    <div class="ai-kicker">${escapeHtml(t("cardRoastEyebrow", leagueName))}</div>
+    <div class="ai-card-name">${escapeHtml(truncate(displayName, 20))}</div>
+    <div class="grade-ring"><div class="grade-letter">${escapeHtml(grade)}</div></div>
+    <div class="grade-caption">${escapeHtml(t("roastGradeCaption"))}</div>
+    <div class="ai-divider"></div>
+    <div class="ai-text">${escapeHtml(truncate(roast, 160))}</div>
+    ${todoHtml}`,
+    gradeCardClass(grade)
+  );
+}
+
+// "Who Won This Trade?" — sideA is always the higher-value side (collectTrades
+// labels it winner/loser server-side), so it always gets the crown + accent
+// color, no client-side comparison needed.
+function tradeVerdictCardHtml(ds, leagueName) {
+  return aiCardShell(`
+    <div class="ai-kicker">${escapeHtml(t("cardTradeVerdictEyebrow", leagueName))}</div>
+    <div class="vs-row">
+      <div class="vs-side winner">
+        <div class="vs-crown">👑</div>
+        <div class="vs-name">${escapeHtml(truncate(ds.aName, 20))}</div>
+        <div class="vs-players">${escapeHtml(truncate(ds.aPlayers, 45))}</div>
+        <div class="vs-value">${Number(ds.aValue).toFixed(1)} pts</div>
+      </div>
+      <div class="vs-mid">⇄</div>
+      <div class="vs-side">
+        <div class="vs-crown">&nbsp;</div>
+        <div class="vs-name">${escapeHtml(truncate(ds.bName, 20))}</div>
+        <div class="vs-players">${escapeHtml(truncate(ds.bPlayers, 45))}</div>
+        <div class="vs-value">${Number(ds.bValue).toFixed(1)} pts</div>
+      </div>
+    </div>
+    <div class="ai-divider"></div>
+    <div class="ai-text">${escapeHtml(truncate(ds.analysis, 150))}</div>`);
+}
+
+// Trade Analyzer — hypothetical, not-yet-made trade, so the "Hypothetical"
+// tag is non-negotiable: this card leaves the app the same way any other
+// share does (WhatsApp/Instagram), and without it a screenshot could read as
+// a real completed trade.
+function tradeAnalyzerCardHtml(ds, leagueName) {
+  return aiCardShell(
+    `
+    <div class="ai-kicker">${escapeHtml(t("cardTradeAnalyzerEyebrow", leagueName))}</div>
+    <div class="ai-hypo-tag">${escapeHtml(t("cardHypotheticalTag"))}</div>
+    <div class="vs-row">
+      <div class="vs-side">
+        <div class="vs-name">${escapeHtml(t("tradeAnalyzerYouOffer"))}</div>
+        <div class="vs-players">${escapeHtml(truncate(ds.offerPlayers, 45))}</div>
+      </div>
+      <div class="vs-mid">⇄</div>
+      <div class="vs-side">
+        <div class="vs-name">${escapeHtml(t("tradeAnalyzerYouRequest"))}</div>
+        <div class="vs-players">${escapeHtml(truncate(ds.requestPlayers, 45))}</div>
+      </div>
+    </div>
+    <div class="verdict-pill">${escapeHtml(t(ds.verdict))}</div>
+    <div class="ai-divider"></div>
+    <div class="ai-text">${escapeHtml(truncate(ds.interpretation, 150))}</div>`,
+    verdictCardClass(ds.verdict)
+  );
+}
+
 function narrativeCardHtml(n, leagueName) {
   return cardShell(`
     <div class="stat-card-eyebrow">${escapeHtml(leagueName)}</div>
@@ -220,7 +347,7 @@ function escapeHtml(str) {
 }
 
 downloadBtn.addEventListener("click", async () => {
-  const node = canvas.querySelector(".stat-card");
+  const node = canvas.querySelector(".stat-card, .ai-card");
   if (!node) return;
   hintEl.textContent = t("generatingImage");
   try {
@@ -236,7 +363,7 @@ downloadBtn.addEventListener("click", async () => {
 });
 
 shareBtn.addEventListener("click", async () => {
-  const node = canvas.querySelector(".stat-card");
+  const node = canvas.querySelector(".stat-card, .ai-card");
   if (!node) return;
   hintEl.textContent = t("generatingImage");
   try {

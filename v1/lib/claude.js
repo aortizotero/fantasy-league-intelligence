@@ -22,14 +22,14 @@ function buildPrompt({ season, week, sideA, sideB }, lang) {
 ${sideA.displayName} recibió: ${sideA.players} (produjeron ${sideA.value.toFixed(1)} puntos fantasy después del trade)
 ${sideB.displayName} recibió: ${sideB.players} (produjeron ${sideB.value.toFixed(1)} puntos fantasy después del trade)
 
-Escribe un análisis breve (3-4 oraciones) en español, en tono de comentarista deportivo, evaluando quién ganó el trade y por qué, basándote SOLO en los puntos producidos que te di. No inventes lesiones, contexto ni datos que no aparecen arriba. No uses encabezados ni markdown, solo texto plano.`;
+Escribe un análisis breve (3-4 oraciones) en español, en tono de comentarista deportivo, evaluando quién ganó el trade y por qué, basándote SOLO en los puntos producidos que te di. Si alguno de los dos lados incluye un pick de draft o FAAB (no un jugador), acláralo — esos puntos de producción no aplican a ese elemento, solo a los jugadores. No inventes lesiones, contexto ni datos que no aparecen arriba. No uses encabezados ni markdown, solo texto plano.`;
   }
   return `You are a fantasy football analyst writing for the managers of a dynasty league. Analyze this real trade from the ${season} season, week ${week}:
 
 ${sideA.displayName} received: ${sideA.players} (produced ${sideA.value.toFixed(1)} fantasy points after the trade)
 ${sideB.displayName} received: ${sideB.players} (produced ${sideB.value.toFixed(1)} fantasy points after the trade)
 
-Write a brief analysis (3-4 sentences) in English, in a sports-commentator tone, evaluating who won the trade and why, based ONLY on the points given above. Don't invent injuries, context, or data not shown above. No headers or markdown, plain text only.`;
+Write a brief analysis (3-4 sentences) in English, in a sports-commentator tone, evaluating who won the trade and why, based ONLY on the points given above. If either side includes a draft pick or FAAB (not a player), call that out — the points production number doesn't apply to it, only to the players. Don't invent injuries, context, or data not shown above. No headers or markdown, plain text only.`;
 }
 
 export async function analyzeTrade(trade, lang = "en") {
@@ -119,6 +119,137 @@ ${shared.yourRoster}: ${formatRosterCounts(offerTeam.rosterCounts)}
 ${shared.theirRoster}: ${formatRosterCounts(requestTeam.rosterCounts)}
 
 ${shared.instructions}`;
+}
+
+// ---- Roast My Team ---------------------------------------------------
+// Backlog item, not part of the original v1-v5 roadmap: evaluate a
+// manager's CURRENT roster (dynasty value + season PPG per player, current
+// position depth, net draft-pick capital — all already computed for
+// Roster Value/Depth/Draft Capital, reused here rather than fetched again)
+// and have Claude both grade it and roast it, same "Claude does the
+// judgment, not a hand-tuned formula" posture as simulateTradeAnalysis.
+const roastCache = new Map();
+const VALID_GRADES = new Set(["A", "B", "C", "D", "F"]);
+
+function formatRoastPlayers(players) {
+  return players.map((p) => `${p.name} (${p.position}, dynasty value ${Math.round(p.value)}, ${p.ppg.toFixed(1)} pts/game this season)`).join("; ");
+}
+
+function formatDraftCapital(netPicks, gained, lost, lang) {
+  const tr = (en, es) => (lang === "es" ? es : en);
+  if (!gained.length && !lost.length) return tr("no picks traded either way", "sin picks tradeados en ningún sentido");
+  const parts = [
+    ...gained.map((p) => `+${p.season} R${p.round}`),
+    ...lost.map((p) => `-${p.season} R${p.round}`),
+  ];
+  return `${netPicks >= 0 ? "+" : ""}${netPicks} ${tr("net picks", "picks netos")} (${parts.join(", ")})`;
+}
+
+function roastCacheKey({ displayName, players, rosterCounts, netPicks, leagueTeams }, lang) {
+  const playersKey = players.map((p) => `${p.name}:${p.value}:${p.ppg}`).sort().join(",");
+  const countsKey = Object.entries(rosterCounts).sort().map(([k, v]) => `${k}${v}`).join(",");
+  const teamsKey = (leagueTeams || []).map((t) => t.displayName).sort().join(",");
+  return `${displayName}|${playersKey}|${countsKey}|${netPicks}|${teamsKey}|${lang}`;
+}
+
+// One line per other roster in the league — top players by dynasty value
+// (already trimmed client-side), position depth, and net draft capital, so
+// Claude can name a REAL trade partner and a REAL player instead of
+// suggesting a fabricated one. Optional: older callers / a league too small
+// to have other teams just get an empty list, and the prompt below adapts.
+function formatLeagueTeams(leagueTeams, lang) {
+  const tr = (en, es) => (lang === "es" ? es : en);
+  return leagueTeams
+    .map(
+      (t) =>
+        `- ${t.displayName}: ${tr("top players", "mejores jugadores")} ${formatRoastPlayers(t.topPlayers)}; ${tr("depth", "profundidad")} ${formatRosterCounts(t.rosterCounts)}; ${t.netPicks >= 0 ? "+" : ""}${t.netPicks} ${tr("net picks", "picks netos")}`
+    )
+    .join("\n");
+}
+
+function buildRoastPrompt({ displayName, players, rosterCounts, netPicks, gained, lost, leagueTeams }, lang) {
+  const shared =
+    lang === "es"
+      ? {
+          intro: `Eres un comentarista de fantasy football dynasty haciendo un "roast" divertido y ácido del roster ACTUAL de un manager para el chat de su liga — es entretenimiento entre amigos, no un análisis serio ni un insulto personal.`,
+          roster: `Roster actual de ${displayName}`,
+          depth: `Profundidad por posición`,
+          capital: `Capital de draft`,
+          otherTeams: `Otros equipos de la liga (para sugerencias de trade)`,
+          instructions: `Usa SOLO estos datos: el valor dynasty y los puntos por partido de cada jugador, la profundidad por posición, y el capital de draft neto — tanto de ${displayName} como de los demás equipos listados abajo. No inventes lesiones, contexto, jugadores ni datos que no aparecen arriba. Burlate de la CONSTRUCCIÓN del roster (jugadores sobrevalorados, posiciones débiles, mala apuesta de draft picks), nunca de la persona — sin groserías ni ataques personales.${
+            leagueTeams?.length
+              ? ` Al menos UNA de las sugerencias debe ser un trade CONCRETO con un equipo real de la lista de abajo — nombra al equipo y a un jugador real suyo (de los que te di), no inventado, que le sirva a ${displayName} o le sirva a ellos a cambio de algo que ${displayName} tenga de sobra.`
+              : ""
+          }
+
+Responde ÚNICAMENTE con un objeto JSON válido, sin markdown ni texto adicional, con esta forma exacta:
+{"grade": "<una letra: A, B, C, D, o F>", "roast": "<3-5 oraciones en español, tono de roast divertido pero fundamentado en los datos>", "suggestions": ["<sugerencia concreta 1>", "<sugerencia concreta 2>", "<sugerencia concreta 3>"]}
+
+"grade" es SIEMPRE una letra exacta en inglés (A/B/C/D/F, no la traduzcas). "roast" y "suggestions" van en español. Las sugerencias deben ser accionables (ej. "tradea a X mientras su valor está alto", "usa tu pick extra de 2027 para llenar RB", "ofrécele a [Equipo] tu exceso de WR a cambio de [Jugador real de ellos], que está enterrado en su banca").`,
+        }
+      : {
+          intro: `You are a dynasty fantasy football commentator giving a fun, savage "roast" of a manager's CURRENT roster for their league group chat — this is entertainment among friends, not a serious analysis or a personal insult.`,
+          roster: `${displayName}'s current roster`,
+          depth: `Depth by position`,
+          capital: `Draft capital`,
+          otherTeams: `Other rosters in the league (for trade suggestions)`,
+          instructions: `Use ONLY this data: each player's dynasty value and points-per-game, position depth, and net draft-pick capital — for ${displayName} AND for the other rosters listed below. Don't invent injuries, context, players, or data not shown above. Roast the roster's CONSTRUCTION (overvalued players, weak positions, bad draft-capital bets), never the person — no profanity, no personal attacks.${
+            leagueTeams?.length
+              ? ` At least ONE suggestion must be a CONCRETE trade with a real team from the list below — name the team and a real player of theirs (from what you were given), not a made-up one, that would help ${displayName} or help them in exchange for something ${displayName} has a surplus of.`
+              : ""
+          }
+
+Respond ONLY with a valid JSON object, no markdown or extra text, in exactly this shape:
+{"grade": "<one letter: A, B, C, D, or F>", "roast": "<3-5 sentences in English, fun roast tone but grounded in the data>", "suggestions": ["<concrete suggestion 1>", "<concrete suggestion 2>", "<concrete suggestion 3>"]}
+
+"grade" is ALWAYS one exact letter (A/B/C/D/F). "roast" and "suggestions" are in English. Suggestions should be actionable (e.g. "trade X while their value is high", "use your extra 2027 pick to address RB", "offer [Team] your extra WR depth for [their real player], who's buried on their bench").`,
+        };
+
+  const otherTeamsBlock = leagueTeams?.length ? `\n\n${shared.otherTeams}:\n${formatLeagueTeams(leagueTeams, lang)}` : "";
+
+  return `${shared.intro}
+
+${shared.roster}: ${formatRoastPlayers(players)}
+
+${shared.depth}: ${formatRosterCounts(rosterCounts)}
+
+${shared.capital}: ${formatDraftCapital(netPicks, gained, lost, lang)}${otherTeamsBlock}
+
+${shared.instructions}`;
+}
+
+export async function roastTeam(team, lang = "en") {
+  const key = roastCacheKey(team, lang);
+  if (roastCache.has(key)) return roastCache.get(key);
+
+  const anthropic = getClient();
+  if (!anthropic) {
+    throw new Error("AI_NOT_CONFIGURED");
+  }
+
+  const response = await anthropic.messages.create({
+    model: "claude-haiku-4-5",
+    max_tokens: 500,
+    messages: [{ role: "user", content: buildRoastPrompt(team, lang) }],
+  });
+
+  const text = response.content.find((block) => block.type === "text")?.text?.trim() || "";
+  const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+
+  let result;
+  try {
+    const parsed = JSON.parse(jsonText);
+    result = {
+      grade: VALID_GRADES.has(parsed.grade) ? parsed.grade : "C",
+      roast: typeof parsed.roast === "string" ? parsed.roast : text,
+      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((s) => typeof s === "string").slice(0, 4) : [],
+    };
+  } catch {
+    result = { grade: "C", roast: text, suggestions: [] };
+  }
+
+  roastCache.set(key, result);
+  return result;
 }
 
 export async function simulateTradeAnalysis(trade, lang = "en") {

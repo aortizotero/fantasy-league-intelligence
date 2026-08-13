@@ -203,7 +203,14 @@ taAnalyzeBtn.addEventListener("click", async () => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t("aiError"));
-    taResultEl.innerHTML = `<span class="verdict-badge verdict-${escapeHtml(data.verdict)}">${escapeHtml(t(data.verdict))}</span><p>${escapeHtml(data.interpretation)}</p>`;
+    // Shareable card — same "data rides on the trigger button" pattern as
+    // the other two AI cards. Player names only (no value/ppg, the card
+    // just needs "who's in the deal"), reusing offerTeam/requestTeam
+    // already built above for the API payload.
+    const offerNames = offerTeam.players.map((p) => p.name).join(", ");
+    const requestNames = requestTeam.players.map((p) => p.name).join(", ");
+    const shareBtnHtml = `<button class="card-trigger-btn card-share-btn" type="button" data-card="tradeAnalyzer" data-offer-players="${escapeHtml(offerNames)}" data-request-players="${escapeHtml(requestNames)}" data-verdict="${escapeHtml(data.verdict)}" data-interpretation="${escapeHtml(data.interpretation)}">${escapeHtml(t("share"))}</button>`;
+    taResultEl.innerHTML = `<span class="verdict-badge verdict-${escapeHtml(data.verdict)}">${escapeHtml(t(data.verdict))}</span><p>${escapeHtml(data.interpretation)}</p>${shareBtnHtml}`;
   } catch (err) {
     taResultEl.textContent = err.message || t("aiError");
   } finally {

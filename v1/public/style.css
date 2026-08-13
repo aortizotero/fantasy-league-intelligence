@@ -408,6 +408,32 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
 }
 .coachmark button:hover { opacity: 1; background: rgba(5, 19, 11, 0.25); }
 
+/* Scroll hint — fixed pill at the bottom of the viewport, shown once per
+   browser right after a league loads (same localStorage-once pattern as the
+   coachmark), dismissed by scrolling, tapping it, or a timeout fallback. */
+.scroll-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-radius: var(--radius-pill);
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  z-index: 5;
+  cursor: pointer;
+  animation: scroll-hint-bounce 1.4s ease-in-out infinite;
+}
+.scroll-hint[hidden] { display: none; }
+
+@keyframes scroll-hint-bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-6px); }
+}
+
 .season-header {
   display: flex;
   align-items: center;
@@ -425,7 +451,8 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
    everywhere instead of being redeclared per section. */
 .card-trigger-btn,
 .ai-analyze-btn,
-.ta-analyze-btn {
+.ta-analyze-btn,
+.roast-btn {
   padding: 6px 12px;
   font-size: 12px;
   border-radius: var(--radius-pill);
@@ -574,6 +601,124 @@ td.card-trigger-cell:hover { background: rgba(0, 196, 106, 0.18); color: var(--a
 }
 .stat-card { position: relative; }
 
+/* ---- AI-card shell — Roast My Team, Who Won This Trade, Trade Analyzer
+   verdict. Unlike .stat-card (fixed square, one stat per card), these three
+   pack a headline + a paragraph + optional structured content, so they get
+   their own 9:16 shape sized for Instagram Stories (320x569 on screen ->
+   960x1707 at html-to-image's pixelRatio:3 export, same ratio as a real
+   1080x1920 Story). safe-top/safe-bottom keep content clear of IG's own
+   profile bar and reply box when posted as a Story. Same "always dark,
+   fixed hex, not theme-reactive" rule as .stat-card — see that block's
+   comment for why. Token names are redeclared locally (same pattern as
+   .stat-card) so every var(--accent)/var(--muted)/var(--border) below
+   resolves the same regardless of the page's active theme. */
+.ai-card {
+  --bg: #0f1115;
+  --card: #171a21;
+  --border: #23262f;
+  --text: #e8eaed;
+  --muted: #8a8f98;
+  --accent: #00c46a;
+  --accent-glow: rgba(0, 196, 106, 0.22);
+  width: 320px;
+  height: 569px;
+  border-radius: var(--radius-pill);
+  background: radial-gradient(120% 90% at 50% 0%, #1c202a 0%, #0f1115 62%);
+  border: 1px solid var(--border);
+  position: relative;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* Semantic tint modifiers — same 3-tier read as the rest of the app
+   (accent green = good, amber = warn, red = bad), plus a neutral gray for
+   an actual "fair" verdict that isn't good OR bad. Default (no modifier)
+   is the green --accent above. */
+.ai-card.ai-card--warn { --accent: #c9a34e; --accent-glow: rgba(201, 163, 78, 0.2); }
+.ai-card.ai-card--neutral { --accent: #9a9ea6; --accent-glow: rgba(154, 158, 166, 0.16); }
+.ai-card.ai-card--bad { --accent: #e5484d; --accent-glow: rgba(229, 72, 77, 0.22); }
+
+.ai-card .safe-top { height: 60px; flex-shrink: 0; }
+.ai-card .safe-bottom { height: 52px; flex-shrink: 0; }
+.ai-body { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0 24px; text-align: center; min-height: 0; }
+.ai-kicker { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--accent); }
+.ai-hypo-tag {
+  margin-top: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+}
+.ai-divider { width: 34px; height: 2px; background: var(--border); border-radius: 2px; margin: 16px 0; flex-shrink: 0; }
+.ai-text { font-size: 13.5px; line-height: 1.6; color: #c7cad1; max-width: 258px; }
+.ai-footer { text-align: center; font-size: 10px; letter-spacing: 0.03em; color: #5b6068; padding-bottom: 4px; }
+
+/* Roast: grade ring hero + "what to do" box */
+.ai-card-name { font-size: 18px; font-weight: 700; margin-top: 8px; }
+.grade-ring {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  margin: 16px 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(60% 60% at 50% 40%, var(--accent-glow), transparent 70%);
+  border: 1.5px solid var(--accent);
+}
+.grade-letter { font-size: 46px; font-weight: 800; color: var(--accent); line-height: 1; }
+.grade-caption { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 4px; }
+.todo-box {
+  margin-top: 16px;
+  width: 100%;
+  max-width: 258px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 11px 13px;
+  flex-shrink: 0;
+}
+.todo-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+.todo-item { font-size: 12px; line-height: 1.5; color: #d8dae0; display: flex; gap: 7px; }
+.todo-item::before { content: "→"; color: var(--accent); flex-shrink: 0; }
+.todo-item + .todo-item { margin-top: 4px; }
+
+/* Trade Verdict / Trade Analyzer: head-to-head comparison block, same "VS"
+   idea as .stat-card-vs but two-sided with a value/players line per side. */
+.vs-row { display: flex; align-items: flex-start; justify-content: center; gap: 14px; width: 100%; margin-top: 14px; }
+.vs-side { flex: 1; min-width: 0; }
+.vs-name { font-size: 13.5px; font-weight: 700; margin-bottom: 4px; }
+.vs-players { font-size: 11.5px; color: #9a9ea6; line-height: 1.4; min-height: 32px; }
+.vs-value { font-size: 15px; font-weight: 800; margin-top: 6px; color: #d8dae0; }
+.vs-side.winner .vs-value { color: var(--accent); }
+.vs-crown { font-size: 13px; margin-bottom: 2px; min-height: 15px; }
+.vs-mid { font-size: 11px; font-weight: 700; color: #4a4f59; padding-top: 22px; flex-shrink: 0; }
+
+.verdict-pill {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 12.5px;
+  font-weight: 700;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+  flex-shrink: 0;
+}
+
+/* Trigger button that opens one of the three cards above from inside an
+   inline AI result block (.ai-result / .ta-result / .roast-result) — same
+   pill as .card-trigger-btn, just with breathing room above it. */
+.card-share-btn { display: block; margin-top: 10px; }
+
 /* ---- "Mi equipo" selector + highlighting --------------------------- */
 #my-team-section {
   display: flex;
@@ -683,6 +828,7 @@ th.is-me { color: var(--accent-text); }
   font-size: 13px;
   line-height: 1.5;
 }
+.ai-result p { margin: 0; }
 
 @media (max-width: 480px) {
   .trade-sides { flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -744,6 +890,43 @@ th.is-me { color: var(--accent-text); }
 .verdict-badge.verdict-fair { color: var(--muted); }
 .verdict-badge.verdict-win_for_them,
 .verdict-badge.verdict-steal_for_them { color: var(--negative); border-color: var(--negative); }
+
+/* ---- Roast My Team --------------------------------------------------
+   Team picker + AI grade/roast/suggestions, same shell as the Trade
+   Analyzer verdict above (grade-badge mirrors verdict-badge) but its own
+   class since the grade alphabet (A-F) doesn't map to verdict's 5 keys. */
+.roast-actions { margin: 10px 0; }
+.roast-btn { font-weight: 600; color: var(--muted); }
+.roast-btn:hover:not(:disabled) { color: var(--accent-text); border-color: var(--accent); opacity: 1; }
+.roast-btn:disabled { cursor: default; opacity: 0.6; }
+.roast-result {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--card);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.roast-result p { margin: 0; }
+.roast-result ul { margin: 4px 0 0; padding-left: 18px; }
+.roast-result li { margin-bottom: 4px; }
+.roast-suggestions-title { margin: 12px 0 4px; font-weight: 600; }
+
+.grade-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+}
+.grade-badge.grade-A,
+.grade-badge.grade-B { color: var(--accent-text); border-color: var(--accent-text); }
+.grade-badge.grade-C { color: var(--muted); }
+.grade-badge.grade-D,
+.grade-badge.grade-F { color: var(--negative); border-color: var(--negative); }
 
 @media (max-width: 480px) {
   .ta-grid { grid-template-columns: 1fr; }

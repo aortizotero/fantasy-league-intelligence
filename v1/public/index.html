@@ -231,6 +231,25 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
     <div class="section-group-header" data-i18n="groupAnalyze">🔮 Analyze &amp; Plan</div>
 
+    <section id="roast-section" hidden>
+      <h2 data-i18n="roastTitle">🔥 Roast My Team</h2>
+      <p class="hint" data-i18n="roastHint">Get an AI evaluation of a roster's current strengths, weaknesses, and what to actually do about it.</p>
+      <label class="sr-only" for="roast-select" data-i18n="roastSelectLabel">Pick a team</label>
+      <select id="roast-select"></select>
+      <div class="roast-actions">
+        <button id="roast-btn" class="roast-btn" type="button" disabled data-i18n="roastBtn">🔥 Roast This Team</button>
+      </div>
+      <div id="roast-result" class="roast-result" hidden></div>
+    </section>
+
+    <section id="trade-history-ai-section" hidden>
+      <h2 data-i18n="tradeHistoryAiTitle">🤔 Who Won This Trade?</h2>
+      <p class="hint" data-i18n="tradeHistoryAiHint">Pick any trade from your league's full history and get an AI verdict — not just the last 5.</p>
+      <label class="sr-only" for="trade-history-ai-select" data-i18n="tradeHistoryAiSelectLabel">Pick a trade</label>
+      <select id="trade-history-ai-select"></select>
+      <div id="trade-history-ai-detail"></div>
+    </section>
+
     <section id="trade-analyzer-section" hidden>
       <h2 data-i18n="tradeAnalyzerTitle">🧮 Trade Analyzer</h2>
       <p class="hint" data-i18n="tradeAnalyzerHint">Pick players to offer and players to request, then get an AI verdict on who wins the trade.</p>
@@ -254,6 +273,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </section>
   </main>
 
+  <div id="scroll-hint" class="scroll-hint" hidden aria-hidden="true">
+    <span data-i18n="scrollHintText">Scroll down for your league's story ↓</span>
+  </div>
+
   <div id="card-modal" class="card-modal" role="dialog" aria-modal="true" data-i18n-aria-label="modalTitle" aria-label="Shareable card" hidden>
     <div class="card-modal-inner">
       <button id="card-close" class="card-close" data-i18n-aria-label="modalClose" aria-label="Close" type="button">✕</button>
@@ -274,6 +297,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <script src="cards.js"></script>
   <script src="myteam.js"></script>
   <script src="tradeAnalyzer.js"></script>
+  <script src="roast.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

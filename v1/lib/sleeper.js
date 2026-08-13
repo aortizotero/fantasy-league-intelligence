@@ -1206,8 +1206,16 @@ async function collectTrades(chain) {
 
   for (const league of chain) {
     const rosterMap = await buildRosterMap(league);
-    const lastWeek = (league.settings?.playoff_week_start || 15) - 1;
-    const weeks = Array.from({ length: Math.max(lastWeek, 0) }, (_, i) => i + 1);
+    // Unlike H2H/narratives/season-stat helpers (which stop at
+    // playoff_week_start - 1 on purpose — playoffs only involve some
+    // teams, so including them would skew competitive comparisons), a
+    // trade can happen during championship weeks too, and this is a
+    // transaction LOG, not a fairness-sensitive stat. Scanning through
+    // WEEK_SEARCH_CAP instead of the playoff cutoff was the fix for a real
+    // miss: the Jan 6 2024 alexortizotero/carlos1rvp Ja'Marr Chase trade
+    // (2023 season, playoff_week_start 15) fell in week 17 and was
+    // silently dropped from every trade-based feature.
+    const weeks = Array.from({ length: WEEK_SEARCH_CAP }, (_, i) => i + 1);
 
     const weeklyMatchups = await Promise.all(weeks.map((week) => getMatchupsCached(league.league_id, week)));
     const valueByRosterPlayer = new Map(); // `${rosterId}:${playerId}` -> points
@@ -1230,10 +1238,6 @@ async function collectTrades(chain) {
 
       for (const t of transactions) {
         if (t.type !== "trade" || t.status !== "complete") continue;
-        // Picks/FAAB carry value our points-only metric can't see — skip
-        // anything but a clean players-for-players trade to keep the
-        // comparison honest rather than mislabeling a fair trade as lopsided.
-        if (t.draft_picks?.length || t.waiver_budget?.length) continue;
         if (!t.adds || Object.keys(t.adds).length < 2) continue;
 
         const sides = new Map(); // rosterId -> playerId[]
@@ -1252,14 +1256,42 @@ async function collectTrades(chain) {
         const valueB = playersB.reduce((sum, id) => sum + (valueByRosterPlayer.get(`${rosterB}:${id}`) || 0), 0);
         const gap = Math.abs(valueA - valueB);
 
+        // Picks/FAAB attached to this trade, per side — carried through so
+        // the log can show "also included a 2024 R4 pick" instead of
+        // silently implying a players-only deal. NOT reflected in
+        // valueA/valueB (that's still points production only), which is
+        // why cleanPlayersOnly gates the "most lopsided" narrative below —
+        // a trade with picks attached can't be honestly reduced to a
+        // single points gap.
+        const picksFor = (rosterId) => (t.draft_picks || []).filter((p) => Number(p.owner_id) === Number(rosterId)).map((p) => ({ season: p.season, round: p.round }));
+        const faabFor = (rosterId) => (t.waiver_budget || []).filter((w) => Number(w.receiver) === Number(rosterId)).reduce((sum, w) => sum + (w.amount || 0), 0);
+        const picksA = picksFor(rosterA);
+        const picksB = picksFor(rosterB);
+        const faabA = faabFor(rosterA);
+        const faabB = faabFor(rosterB);
+        const cleanPlayersOnly = !picksA.length && !picksB.length && !faabA && !faabB;
+
         const winnerIsA = valueA >= valueB;
         trades.push({
           season: league.season,
           week,
           timestamp: t.created,
           gap,
-          winner: { owner: winnerIsA ? ownerA : ownerB, players: winnerIsA ? playersA : playersB, value: winnerIsA ? valueA : valueB },
-          loser: { owner: winnerIsA ? ownerB : ownerA, players: winnerIsA ? playersB : playersA, value: winnerIsA ? valueB : valueA },
+          cleanPlayersOnly,
+          winner: {
+            owner: winnerIsA ? ownerA : ownerB,
+            players: winnerIsA ? playersA : playersB,
+            value: winnerIsA ? valueA : valueB,
+            picks: winnerIsA ? picksA : picksB,
+            faab: winnerIsA ? faabA : faabB,
+          },
+          loser: {
+            owner: winnerIsA ? ownerB : ownerA,
+            players: winnerIsA ? playersB : playersA,
+            value: winnerIsA ? valueB : valueA,
+            picks: winnerIsA ? picksB : picksA,
+            faab: winnerIsA ? faabB : faabA,
+          },
         });
       }
     });
@@ -1281,8 +1313,10 @@ async function collectWaiverMoves(chain) {
 
   for (const league of chain) {
     const rosterMap = await buildRosterMap(league);
-    const lastWeek = (league.settings?.playoff_week_start || 15) - 1;
-    const weeks = Array.from({ length: Math.max(lastWeek, 0) }, (_, i) => i + 1);
+    // Same WEEK_SEARCH_CAP reasoning as collectTrades above — a waiver
+    // claim or free-agent move during playoff weeks is still a real
+    // transaction, not a competitive stat, so it shouldn't be excluded.
+    const weeks = Array.from({ length: WEEK_SEARCH_CAP }, (_, i) => i + 1);
     const weeklyTransactions = await Promise.all(weeks.map((week) => getTransactionsCached(league.league_id, week)));
 
     weeklyTransactions.forEach((transactions, weekIdx) => {
@@ -1354,6 +1388,17 @@ export async function computeTransactionHistory(chain, playersMap, lang = "en") 
   const tr = (en, es) => (lang === "es" ? es : en);
   const playerName = (id) => playersMap.get(id)?.name || tr(`Player ${id}`, `Jugador ${id}`);
   const namesOf = (ids) => ids.map(playerName).join(", ");
+  // Folds a side's players AND any picks/FAAB attached to the same trade
+  // into one display string — a trade that also moved a draft pick (like
+  // the real Ja'Marr Chase-for-picks trade that surfaced this gap) used to
+  // render as if it were a clean players-only swap, which is misleading
+  // about what was actually given up.
+  const sideDisplay = (side) => {
+    const parts = [...side.players.map(playerName)];
+    parts.push(...side.picks.map((p) => tr(`${p.season} Round ${p.round} pick`, `Pick Ronda ${p.round} ${p.season}`)));
+    if (side.faab) parts.push(`$${side.faab} FAAB`);
+    return parts.join(", ");
+  };
 
   const [trades, waiverMoves, draftPicks] = await Promise.all([
     collectTrades(chain),
@@ -1368,8 +1413,8 @@ export async function computeTransactionHistory(chain, playersMap, lang = "en") 
       week: t.week,
       timestamp: t.timestamp,
       pickNo: -1,
-      sideA: { ownerId: t.winner.owner.ownerId, displayName: t.winner.owner.displayName, players: namesOf(t.winner.players), value: t.winner.value },
-      sideB: { ownerId: t.loser.owner.ownerId, displayName: t.loser.owner.displayName, players: namesOf(t.loser.players), value: t.loser.value },
+      sideA: { ownerId: t.winner.owner.ownerId, displayName: t.winner.owner.displayName, players: sideDisplay(t.winner), value: t.winner.value },
+      sideB: { ownerId: t.loser.owner.ownerId, displayName: t.loser.owner.displayName, players: sideDisplay(t.loser), value: t.loser.value },
     })),
     ...waiverMoves.map((m) => ({
       type: m.waiverType,
@@ -1401,7 +1446,13 @@ export async function computeTransactionHistory(chain, playersMap, lang = "en") 
 async function computeTradeNarratives(chain, playersMap, lang) {
   const tr = (en, es) => (lang === "es" ? es : en);
   const trades = await collectTrades(chain);
-  const mostLopsided = trades.filter((t) => t.gap >= MIN_TRADE_VALUE_GAP).reduce((best, t) => (!best || t.gap > best.gap ? t : best), null);
+  // cleanPlayersOnly-only: a trade with picks/FAAB attached can't be
+  // honestly reduced to a single points gap (see collectTrades), so it's
+  // excluded from "most lopsided" even though it now shows up in the full
+  // Transaction History log.
+  const mostLopsided = trades
+    .filter((t) => t.cleanPlayersOnly && t.gap >= MIN_TRADE_VALUE_GAP)
+    .reduce((best, t) => (!best || t.gap > best.gap ? t : best), null);
 
   if (!mostLopsided) return [];
 
