@@ -248,6 +248,25 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div id="roast-result" class="roast-result" hidden></div>
     </section>
 
+    <section id="trade-suggest-section" hidden>
+      <h2 data-i18n="tradeSuggestTitle">🧭 What Should You Offer Them?</h2>
+      <p class="hint" data-i18n="tradeSuggestHint">Pick a team and get an AI-recommended trade to offer them — or find out it's not worth pursuing right now.</p>
+      <div class="ta-grid trade-suggest-pickers">
+        <div class="ta-side">
+          <label class="sr-only" for="trade-suggest-your-select" data-i18n="tradeAnalyzerYourTeam">Your team</label>
+          <select id="trade-suggest-your-select"></select>
+        </div>
+        <div class="ta-side">
+          <label class="sr-only" for="trade-suggest-target-select" data-i18n="tradeSuggestTargetTeamLabel">Target team</label>
+          <select id="trade-suggest-target-select"></select>
+        </div>
+      </div>
+      <div class="roast-actions">
+        <button id="trade-suggest-btn" class="roast-btn" type="button" disabled data-i18n="tradeSuggestBtn">🧭 Suggest a Trade</button>
+      </div>
+      <div id="trade-suggest-result" class="roast-result" hidden></div>
+    </section>
+
     <section id="trade-history-ai-section" hidden>
       <h2 data-i18n="tradeHistoryAiTitle">🤔 Who Won This Trade?</h2>
       <p class="hint" data-i18n="tradeHistoryAiHint">Pick any trade from your league's full history and get an AI verdict — not just the last 5.</p>
@@ -279,6 +298,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </section>
   </main>
 
+  <footer class="site-footer">
+    <p data-i18n="footerDisclaimer">Story of My League is an independent fan project. Not affiliated with, endorsed by, or sponsored by the NFL, Sleeper, ESPN, or FantasyCalc. All team and player names are the property of their respective owners.</p>
+    <p><a href="/privacy.html" data-i18n="footerPrivacyLink">Privacy Policy</a></p>
+  </footer>
+
   <div id="scroll-hint" class="scroll-hint" hidden aria-hidden="true">
     <span data-i18n="scrollHintText">Scroll down for your league's story ↓</span>
   </div>
@@ -304,6 +328,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <script src="myteam.js"></script>
   <script src="tradeAnalyzer.js"></script>
   <script src="roast.js"></script>
+  <script src="tradeSuggest.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

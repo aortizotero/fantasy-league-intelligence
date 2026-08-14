@@ -130,6 +130,8 @@ function buildCardHtml(ds) {
       return tradeVerdictCardHtml(ds, leagueName);
     case "tradeAnalyzer":
       return tradeAnalyzerCardHtml(ds, leagueName);
+    case "tradeSuggest":
+      return tradeSuggestCardHtml(ds, leagueName);
     default:
       return null;
   }
@@ -321,6 +323,37 @@ function tradeAnalyzerCardHtml(ds, leagueName) {
   );
 }
 
+// "What Should You Offer Them?" — two shapes depending on the recommendation:
+// "propose" gets the same VS layout as Trade Analyzer's card (offer vs.
+// request), "pass" has no players to show so it's just the target's name
+// and the reasoning — a card that only ever says "don't bother" is still
+// worth sharing (it's the honest answer), it just doesn't get a VS block.
+function tradeSuggestCardHtml(ds, leagueName) {
+  const isPropose = ds.recommendation === "propose";
+  const middleHtml = isPropose
+    ? `<div class="vs-row">
+        <div class="vs-side">
+          <div class="vs-name">${escapeHtml(t("tradeAnalyzerYouOffer"))}</div>
+          <div class="vs-players">${escapeHtml(ds.offerPlayers)}</div>
+        </div>
+        <div class="vs-mid">⇄</div>
+        <div class="vs-side">
+          <div class="vs-name">${escapeHtml(ds.targetName)}</div>
+          <div class="vs-players">${escapeHtml(ds.requestPlayers)}</div>
+        </div>
+      </div>`
+    : `<div class="ai-card-name">${escapeHtml(ds.targetName)}</div>`;
+  return aiCardShell(
+    `
+    <div class="ai-kicker">${escapeHtml(t("cardTradeSuggestEyebrow", leagueName))}</div>
+    ${middleHtml}
+    <div class="verdict-pill">${escapeHtml(t(isPropose ? "tradeSuggestPropose" : "tradeSuggestPass"))}</div>
+    <div class="ai-divider"></div>
+    <div class="ai-text">${escapeHtml(ds.summary)}</div>`,
+    isPropose ? "" : "ai-card--neutral"
+  );
+}
+
 function narrativeCardHtml(n, leagueName) {
   return cardShell(`
     <div class="stat-card-eyebrow">${escapeHtml(leagueName)}</div>
@@ -337,6 +370,24 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// GA4's recommended "share" event shape (method/content_type/item_id) —
+// pushed to the dataLayer GTM's own snippet (index.html) already created,
+// so this needs zero new script tags. item_id is the card type
+// (goat/h2h/roast/tradeVerdict/...), read off modalTrigger — the button
+// that opened this card is still the one on hand when Download/Share is
+// clicked. Only called on a CONFIRMED send (not on generation errors, and
+// not when the user cancels the native share sheet — see the AbortError
+// check below).
+function trackShare(method) {
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: "share",
+    method,
+    content_type: "stat_card",
+    item_id: modalTrigger?.dataset.card || "unknown",
+  });
+}
+
 downloadBtn.addEventListener("click", async () => {
   const node = canvas.querySelector(".stat-card, .ai-card");
   if (!node) return;
@@ -348,6 +399,7 @@ downloadBtn.addEventListener("click", async () => {
     a.download = "fantasy-league-card.png";
     a.click();
     hintEl.textContent = "";
+    trackShare("download");
   } catch (err) {
     hintEl.textContent = t("imageError");
   }
@@ -364,6 +416,7 @@ shareBtn.addEventListener("click", async () => {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({ files: [file], title: "www.storyofmyleague.com" });
       hintEl.textContent = "";
+      trackShare("web_share_api");
     } else {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -372,6 +425,7 @@ shareBtn.addEventListener("click", async () => {
       a.click();
       URL.revokeObjectURL(url);
       hintEl.textContent = t("shareUnsupported");
+      trackShare("download_fallback");
     }
   } catch (err) {
     if (err.name !== "AbortError") hintEl.textContent = t("shareError");

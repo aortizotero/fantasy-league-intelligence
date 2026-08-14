@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Story of My League</title>
+<meta name="description" content="Privacy policy for storyofmyleague.com — what data we collect, what third-party services we use, and how your information is handled.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.storyofmyleague.com/privacy.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%88%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script>
+  (function () {
+    var saved = localStorage.getItem("fli:theme");
+    if (saved) document.documentElement.dataset.theme = saved;
+  })();
+</script>
+</head>
+<body>
+  <header>
+    <div class="lang-toggle">
+      <button type="button" id="theme-toggle" aria-label="Toggle light/dark mode">🌙</button>
+      <button type="button" data-lang-btn="en">EN</button>
+      <button type="button" data-lang-btn="es">ES</button>
+    </div>
+    <h1><a href="/">🏈 www.storyofmyleague.com</a></h1>
+  </header>
+
+  <main class="legal-page">
+    <h2 data-i18n="privacyTitle">Privacy Policy</h2>
+    <p class="hint" data-i18n="privacyUpdated">Last updated: August 14, 2026.</p>
+
+    <section>
+      <h3 data-i18n="privacyWhoTitle">Who runs this site</h3>
+      <p data-i18n="privacyWhoBody">Story of My League is an independent, non-commercial fan project built and run by one person. It isn't a company, and it doesn't sell anything, run ads, or charge for anything.</p>
+    </section>
+
+    <section>
+      <h3 data-i18n="privacyDataTitle">What we collect</h3>
+      <ul>
+        <li data-i18n="privacyDataLeagueId">The Sleeper League ID you enter is sent to Sleeper's public API to fetch your league's data. It isn't stored in a database — aside from a short-lived in-memory cache used to speed up repeat views, it's discarded after your request.</li>
+        <li data-i18n="privacyDataAnalytics">Standard analytics via Google Tag Manager / Google Analytics (page views and feature usage, like when a stat card is shared) — aggregate usage data, not tied to your name or email.</li>
+        <li data-i18n="privacyDataTurnstile">A short-lived, signed cookie set after you pass a Cloudflare Turnstile bot check, so you don't have to re-verify on every request.</li>
+        <li data-i18n="privacyDataTheme">Your language and light/dark theme preference, saved locally in your browser (localStorage) — never sent to our server.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3 data-i18n="privacyThirdPartyTitle">Third-party services this site uses</h3>
+      <ul>
+        <li data-i18n="privacyThirdPartySleeper">Sleeper — the source of all league, roster, and player data on this site.</li>
+        <li data-i18n="privacyThirdPartyEspn">ESPN — used to enrich a couple of stat narratives with real game stat lines.</li>
+        <li data-i18n="privacyThirdPartyFantasyCalc">FantasyCalc — used for dynasty trade values.</li>
+        <li data-i18n="privacyThirdPartyAnthropic">Anthropic (Claude) — powers the optional AI features (trade analysis, roasts, trade suggestions). Using one of these sends the specific roster/trade data being analyzed to Anthropic's API to generate that response.</li>
+        <li data-i18n="privacyThirdPartyGoogle">Google Tag Manager / Google Analytics — site analytics.</li>
+        <li data-i18n="privacyThirdPartyCloudflare">Cloudflare Turnstile — bot/spam protection on the League ID form.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3 data-i18n="privacyChoicesTitle">Your choices</h3>
+      <p data-i18n="privacyChoicesBody">Browser privacy controls (blocking third-party cookies, ad blockers, "do not track" extensions) are fine to use — the site's core features (standings, GOAT, H2H, narratives) work the same either way. The AI features need to send the roster/trade data being analyzed to work, since that's what generates the response.</p>
+    </section>
+
+    <section>
+      <h3 data-i18n="privacyContactTitle">Contact</h3>
+      <p data-i18n="privacyContactBody">Questions about this policy? Reach out:</p>
+      <p><a href="mailto:alexortizotero@icloud.com">alexortizotero@icloud.com</a></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p data-i18n="footerDisclaimer">Story of My League is an independent fan project. Not affiliated with, endorsed by, or sponsored by the NFL, Sleeper, ESPN, or FantasyCalc. All team and player names are the property of their respective owners.</p>
+    <p><a href="/">← <span data-i18n="footerBackHome">Back to Story of My League</span></a></p>
+  </footer>
+
+  <script src="theme.js"></script>
+  <script src="i18n.js"></script>
+</body>
+</html>

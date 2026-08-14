@@ -23,7 +23,7 @@ import {
   computePositionPointsReport,
   computeRosterPlayerPool,
 } from "./lib/sleeper.js";
-import { analyzeTrade, simulateTradeAnalysis, roastTeam } from "./lib/claude.js";
+import { analyzeTrade, simulateTradeAnalysis, roastTeam, suggestTrade } from "./lib/claude.js";
 import { checkTurnstile } from "./lib/turnstile.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -239,13 +239,14 @@ app.post("/api/trade-simulate", async (req, res) => {
     es: { badRequest: "Datos de trade inválidos.", notConfigured: "El análisis con IA no está configurado en este deployment.", failed: "No se pudo generar el análisis. " },
   }[lang];
 
-  const { offerTeam, requestTeam } = req.body || {};
-  if (!isValidSimulatedTeam(offerTeam) || !isValidSimulatedTeam(requestTeam)) {
+  const { offerTeam, requestTeam, seasonDataAvailable } = req.body || {};
+  const validSeasonFlag = seasonDataAvailable === undefined || typeof seasonDataAvailable === "boolean";
+  if (!isValidSimulatedTeam(offerTeam) || !isValidSimulatedTeam(requestTeam) || !validSeasonFlag) {
     return res.status(400).json({ error: errors.badRequest });
   }
 
   try {
-    const result = await simulateTradeAnalysis({ offerTeam, requestTeam }, lang);
+    const result = await simulateTradeAnalysis({ offerTeam, requestTeam, seasonDataAvailable: seasonDataAvailable ?? true }, lang);
     res.json(result);
   } catch (err) {
     if (err.message === "AI_NOT_CONFIGURED") {
@@ -314,14 +315,84 @@ app.post("/api/roast-team", async (req, res) => {
     es: { badRequest: "Datos de equipo inválidos.", notConfigured: "El análisis con IA no está configurado en este deployment.", failed: "No se pudo generar el roast. " },
   }[lang];
 
-  const { displayName, players, rosterCounts, netPicks, gained, lost, leagueTeams } = req.body || {};
+  const { displayName, players, rosterCounts, netPicks, gained, lost, leagueTeams, seasonDataAvailable } = req.body || {};
   const validLeagueTeams = leagueTeams === undefined || (Array.isArray(leagueTeams) && leagueTeams.length <= 30 && leagueTeams.every(isValidLeagueTeam));
-  if (!isValidRoastTeam({ displayName, players, rosterCounts, netPicks, gained, lost }) || !validLeagueTeams) {
+  const validSeasonFlag = seasonDataAvailable === undefined || typeof seasonDataAvailable === "boolean";
+  if (!isValidRoastTeam({ displayName, players, rosterCounts, netPicks, gained, lost }) || !validLeagueTeams || !validSeasonFlag) {
     return res.status(400).json({ error: errors.badRequest });
   }
 
   try {
-    const result = await roastTeam({ displayName, players, rosterCounts, netPicks, gained, lost, leagueTeams }, lang);
+    const result = await roastTeam({ displayName, players, rosterCounts, netPicks, gained, lost, leagueTeams, seasonDataAvailable: seasonDataAvailable ?? true }, lang);
+    res.json(result);
+  } catch (err) {
+    if (err.message === "AI_NOT_CONFIGURED") {
+      return res.status(503).json({ error: errors.notConfigured });
+    }
+    console.error(err);
+    res.status(500).json({ error: errors.failed + err.message });
+  }
+});
+
+// Trade Suggester ("What should you offer them?") — distinct from
+// /api/trade-simulate, which grades a trade the user already picked.
+// This one only takes a target team; Claude proposes the trade itself (or
+// says to pass), so the validation here doesn't need a players.length
+// floor of 1 on the offer side the way isValidSimulatedTeam does — both
+// sides come straight from computeRosterPlayerPool, so a real roster with
+// zero tradeable players just never gets this far (the section hides
+// itself client-side, see tradeSuggest.js).
+function isValidTradeSuggestTeam(team) {
+  return (
+    team &&
+    typeof team.displayName === "string" &&
+    team.displayName.length <= 100 &&
+    Array.isArray(team.players) &&
+    team.players.length >= 1 &&
+    team.players.length <= 40 &&
+    team.players.every(isValidPickedPlayer) &&
+    team.rosterCounts &&
+    typeof team.rosterCounts === "object" &&
+    Object.values(team.rosterCounts).every((n) => Number.isInteger(n) && n >= 0)
+  );
+}
+
+function isValidTeamRecord(record) {
+  return (
+    record === null ||
+    record === undefined ||
+    (typeof record === "object" &&
+      Number.isInteger(record.wins) &&
+      record.wins >= 0 &&
+      Number.isInteger(record.losses) &&
+      record.losses >= 0 &&
+      Number.isInteger(record.ties) &&
+      record.ties >= 0 &&
+      typeof record.pointsFor === "number" &&
+      Number.isFinite(record.pointsFor))
+  );
+}
+
+app.post("/api/trade-suggest", async (req, res) => {
+  const lang = req.body?.lang === "es" ? "es" : "en";
+  const errors = {
+    en: { badRequest: "Invalid team data.", notConfigured: "AI analysis isn't configured for this deployment.", failed: "Couldn't generate the suggestion. " },
+    es: { badRequest: "Datos de equipo inválidos.", notConfigured: "El análisis con IA no está configurado en este deployment.", failed: "No se pudo generar la sugerencia. " },
+  }[lang];
+
+  const { yourTeam, targetTeam, seasonDataAvailable } = req.body || {};
+  const validSeasonFlag = typeof seasonDataAvailable === "boolean";
+  if (
+    !isValidTradeSuggestTeam(yourTeam) ||
+    !isValidTradeSuggestTeam(targetTeam) ||
+    !isValidTeamRecord(targetTeam?.record) ||
+    !validSeasonFlag
+  ) {
+    return res.status(400).json({ error: errors.badRequest });
+  }
+
+  try {
+    const result = await suggestTrade({ yourTeam, targetTeam, seasonDataAvailable }, lang);
     res.json(result);
   } catch (err) {
     if (err.message === "AI_NOT_CONFIGURED") {

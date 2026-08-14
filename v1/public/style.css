@@ -1042,6 +1042,61 @@ th.is-me { color: var(--accent-text); }
   .ta-grid { grid-template-columns: 1fr; }
 }
 
+/* ---- Trade Suggester ("What should you offer them?") --------------------
+   Two-select target picker (reuses .ta-grid/.ta-side/.roast-btn/.roast-result
+   for visual consistency with Trade Analyzer/Roast) + its own badge, since
+   "propose"/"pass" is a 2-state outcome, not the 5-key verdict or A-F grade
+   alphabet the other two AI tools use. */
+.trade-suggest-pickers { margin-top: 12px; }
+.trade-suggest-pickers select { width: 100%; }
+.trade-suggest-package {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-control);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.recommendation-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+}
+.recommendation-badge.recommendation-propose { color: var(--accent-text); border-color: var(--accent-text); }
+.recommendation-badge.recommendation-pass { color: var(--muted); }
+
+/* ---- Site footer -----------------------------------------------------
+   Lives outside #results (which stays hidden until a league loads) so the
+   NFL/Sleeper/ESPN/FantasyCalc disclaimer and Privacy Policy link are on
+   the page from first load, not just after a successful fetch. */
+.site-footer {
+  max-width: 560px;
+  margin: 48px auto 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.site-footer p { margin: 4px 0; }
+.site-footer a { color: var(--accent-text); text-decoration: none; }
+.site-footer a:hover { text-decoration: underline; }
+
+/* ---- Privacy Policy page (privacy.html) ------------------------------- */
+.legal-page { max-width: 640px; margin: 0 auto; }
+.legal-page h2 { margin-bottom: 4px; }
+.legal-page section { margin-top: 28px; }
+.legal-page h3 { font-size: 16px; margin-bottom: 6px; }
+.legal-page p { font-size: 14px; line-height: 1.6; margin: 0 0 8px; }
+.legal-page li { font-size: 14px; line-height: 1.6; }
+.legal-page ul { padding-left: 20px; display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.legal-page a { color: var(--accent-text); }
+
 @media (max-width: 480px) {
   body { padding: 20px 12px 60px; }
   #league-form { flex-direction: column; max-width: 100%; }

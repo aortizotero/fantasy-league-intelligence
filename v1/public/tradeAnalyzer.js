@@ -171,6 +171,12 @@ function hideResult() {
   taResultEl.innerHTML = "";
 }
 
+// Same "ghost season" signal used by roast.js/tradeSuggest.js — see
+// roastSeasonDataAvailable() in roast.js for why this matters.
+function taSeasonDataAvailable() {
+  return (taData.currentStandings || []).some((s) => (s.wins || 0) + (s.losses || 0) + (s.ties || 0) > 0);
+}
+
 function buildTeamPayload(side) {
   const team = teamForSide(side);
   const selectedSet = side === "offer" ? taOfferSelected : taRequestSelected;
@@ -199,7 +205,7 @@ taAnalyzeBtn.addEventListener("click", async () => {
     const res = await fetch("/api/trade-simulate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ offerTeam, requestTeam, lang: getLang() }),
+      body: JSON.stringify({ offerTeam, requestTeam, seasonDataAvailable: taSeasonDataAvailable(), lang: getLang() }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t("aiError"));

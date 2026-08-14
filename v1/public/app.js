@@ -105,6 +105,7 @@ async function loadLeague(leagueId) {
     if (window.initMyTeam) window.initMyTeam(data, leagueId);
     if (window.initTradeAnalyzer) window.initTradeAnalyzer(data, leagueId);
     if (window.initRoast) window.initRoast(data);
+    if (window.initTradeSuggest) window.initTradeSuggest(data);
     statusEl.textContent = "";
     results.hidden = false;
     maybeShowCoachmark();

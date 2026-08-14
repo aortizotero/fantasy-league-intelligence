@@ -43,6 +43,17 @@ function hideRoastResult() {
   roastResultEl.innerHTML = "";
 }
 
+// Same "ghost season" signal used by tradeSuggest.js/tradeAnalyzer.js: if
+// nobody in current standings has played a game yet, per-player PPG is
+// meaningless (computeSeasonPlayerPpg never saw a real week, so every value
+// defaults to 0) — this decides whether lib/claude.js's buildRoastPrompt
+// mentions season points at all. Was previously computed nowhere, so the
+// server always defaulted to true and the roast kept narrating "0.0
+// pts/game" as if it were real production.
+function roastSeasonDataAvailable() {
+  return (roastData.currentStandings || []).some((s) => (s.wins || 0) + (s.losses || 0) + (s.ties || 0) > 0);
+}
+
 const ROAST_TOP_PLAYERS_PER_OTHER_TEAM = 8; // enough real ammo for a concrete trade suggestion, without ballooning the prompt with every other team's full 24-player roster
 
 // Same shape computeRosterPlayerPool/computeRosterDepth/computeDraftPickCapital
@@ -96,7 +107,7 @@ roastBtn.addEventListener("click", async () => {
     const res = await fetch("/api/roast-team", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, lang: getLang() }),
+      body: JSON.stringify({ ...payload, seasonDataAvailable: roastSeasonDataAvailable(), lang: getLang() }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t("aiError"));
