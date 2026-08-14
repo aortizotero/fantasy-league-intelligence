@@ -70,7 +70,16 @@ export async function checkTurnstile(req, res) {
   }
 
   if (verified) {
-    res.cookie(COOKIE_NAME, makeCookieValue(), { httpOnly: true, sameSite: "lax", maxAge: COOKIE_TTL_MS });
+    // secure gated on NODE_ENV rather than always-on, so it still works over
+    // plain http://localhost in local dev — production (behind Coolify/
+    // Let's Encrypt) always sets it, so the cookie never goes out in the
+    // clear on a real deployment.
+    res.cookie(COOKIE_NAME, makeCookieValue(), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: COOKIE_TTL_MS,
+    });
   }
   return verified;
 }

@@ -11,8 +11,15 @@ function getClient() {
 // point totals never change, so a cached analysis never goes stale.
 const analysisCache = new Map();
 
+// Includes the actual trade content (players/value), not just the
+// season/week/manager-name identifiers — otherwise a POST with forged
+// players/value but a real season/week/displayName combo would overwrite
+// (and, since this cache has no TTL, permanently poison) the analysis
+// served to every future legitimate visitor of that real trade. Same
+// "cache key covers everything the prompt is built from" pattern already
+// used correctly by simulationCacheKey/roastCacheKey/suggestCacheKey below.
 function cacheKey(trade, lang) {
-  return `${trade.season}:${trade.week}:${trade.sideA.displayName}:${trade.sideB.displayName}:${lang}`;
+  return `${trade.season}:${trade.week}:${trade.sideA.displayName}:${trade.sideA.players}:${trade.sideA.value}:${trade.sideB.displayName}:${trade.sideB.players}:${trade.sideB.value}:${lang}`;
 }
 
 // Asks for the full analysis AND a card-length summary in the same call —

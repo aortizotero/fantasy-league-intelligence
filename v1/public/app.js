@@ -1048,8 +1048,16 @@ function uniqueAbbreviations(managers) {
   return result;
 }
 
+// The textContent->innerHTML round-trip only escapes &, <, > — safe for
+// text-node contexts, but every caller in this codebase also uses it to
+// build HTML attributes (data-*, title, aria-label) via string
+// interpolation. Without escaping quotes too, an unescaped `"` in the
+// source string (e.g. a Sleeper team_name, which any Sleeper user
+// controls) breaks out of the attribute and injects a live event handler
+// — quote-encoding here is what closes that off for every call site at
+// once.
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str ?? "";
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
