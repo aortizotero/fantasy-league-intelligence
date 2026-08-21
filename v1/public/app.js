@@ -108,11 +108,43 @@ async function loadLeague(leagueId) {
     if (window.initTradeSuggest) window.initTradeSuggest(data);
     statusEl.textContent = "";
     results.hidden = false;
+    setupScrollReveal();
     maybeShowCoachmark();
     maybeShowScrollHint();
   } catch (err) {
     statusEl.textContent = "⚠️ " + err.message;
   }
+}
+
+// Fades each visible section in as it enters the viewport — native
+// IntersectionObserver, no animation library. Re-run on every league load
+// (not just once) since toggleSection hides/shows different sections per
+// league, and re-observing a section already on screen fires its callback
+// immediately, so nothing above the fold stays invisible. The CSS class
+// itself only exists inside a prefers-reduced-motion:no-preference query
+// (style.css), so this is a no-op start state for reduced-motion users and
+// for anyone with JS disabled (the class is never applied at all).
+let scrollRevealObserver = null;
+function setupScrollReveal() {
+  if (scrollRevealObserver) scrollRevealObserver.disconnect();
+  if (!("IntersectionObserver" in window)) return;
+  const sections = results.querySelectorAll("section:not([hidden])");
+  if (!sections.length) return;
+  scrollRevealObserver = new IntersectionObserver(
+    (entries, observer) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add("in-view");
+        observer.unobserve(entry.target);
+      }
+    },
+    { rootMargin: "0px 0px -10% 0px" }
+  );
+  sections.forEach((section) => {
+    section.classList.remove("in-view");
+    section.classList.add("reveal");
+    scrollRevealObserver.observe(section);
+  });
 }
 
 // Shown once, the first time results ever render for this browser — points
@@ -221,6 +253,7 @@ function render(data) {
 
   document.getElementById("current-standings").innerHTML = scrollWrap(standingsTable(data.currentStandings));
   document.getElementById("goat").innerHTML = goatCard(data.goat);
+  toggleSection("hall-of-fame-section", "hall-of-fame", data.hallOfFame, hallOfFameCards, false);
   document.getElementById("h2h").innerHTML = scrollWrap(h2hMatrix(data.h2h, data.goat));
   populateSeasonFilter(data.historicalStandings);
   renderSeasonScoped();
@@ -633,7 +666,7 @@ function draftPicksTable(draftPicks) {
       ].join(", ");
       return `
     <tr data-owner-id="${escapeHtml(d.ownerId)}">
-      <td>${escapeHtml(d.displayName)}</td>
+      <td class="name-cell">${escapeHtml(d.displayName)}</td>
       <td class="${d.netPicks > 0 ? "depth-max" : ""}">${d.netPicks > 0 ? "+" : ""}${d.netPicks}</td>
       <td class="hint">${detail || t("noMoves")}</td>
     </tr>`;
@@ -714,7 +747,7 @@ function powerRankingsTable(rankings) {
       return `
     <tr data-owner-id="${escapeHtml(r.ownerId)}">
       <td>${r.rank}</td>
-      <td>${escapeHtml(r.displayName)}</td>
+      <td class="name-cell">${escapeHtml(r.displayName)}</td>
       <td>${movementHtml}</td>
     </tr>`;
     })
@@ -935,7 +968,7 @@ function standingsTable(standings) {
       (s, i) => `
     <tr data-owner-id="${escapeHtml(s.ownerId)}">
       <td>${i + 1}</td>
-      <td>${escapeHtml(s.displayName)}</td>
+      <td class="name-cell">${escapeHtml(s.displayName)}</td>
       <td>${s.wins}-${s.losses}${s.ties ? `-${s.ties}` : ""}</td>
       <td>${s.pointsFor.toFixed(1)}</td>
       <td>${s.pointsAgainst.toFixed(1)}</td>
@@ -961,6 +994,48 @@ function narrativeCards(narratives) {
     .join("")}</div>`;
 }
 
+const HOF_CATEGORY_LABEL_KEYS = {
+  championships: "hofCategoryChampionships",
+  careerPoints: "hofCategoryCareerPoints",
+  winPct: "hofCategoryWinPct",
+  streak: "hofCategoryStreak",
+};
+
+function hallOfFameStatLine(e) {
+  switch (e.category) {
+    case "championships":
+      return `${e.championships} ${e.championships === 1 ? t("hofTitleSingular") : t("hofTitlesPlural")}`;
+    case "careerPoints":
+      return `${e.pointsFor.toFixed(1)} ${t("cardPoints")} · ${e.seasons} ${t("colSeasons").toLowerCase()}`;
+    case "winPct":
+      return `${(e.winPct * 100).toFixed(1)}% (${e.wins}-${e.losses}${e.ties ? `-${e.ties}` : ""})`;
+    case "streak":
+      return `${e.streak} ${t("hofGamesSuffix")} · ${e.season}`;
+    default:
+      return "";
+  }
+}
+
+// GOAT answers "who's best overall" — Hall of Fame answers four narrower
+// record-book questions, one tile each. Reuses .narrative-card/.narrative-grid
+// wholesale (same headline-card shape) instead of a new component, and rides
+// data-owner-id for free "Mi equipo" highlighting.
+function hallOfFameCards(entries) {
+  if (!entries.length) return `<p class="hint">${t("noData")}</p>`;
+  return `<div class="narrative-grid">${entries
+    .map(
+      (e, i) => `
+    <div class="narrative-card" data-owner-id="${escapeHtml(e.ownerId)}">
+      <div class="narrative-icon">${e.icon}</div>
+      <div class="narrative-title">${escapeHtml(t(HOF_CATEGORY_LABEL_KEYS[e.category]))}</div>
+      <div class="narrative-headline">${escapeHtml(e.displayName)}</div>
+      <div class="narrative-detail">${escapeHtml(hallOfFameStatLine(e))}</div>
+      <button class="card-trigger-btn" data-card="hallOfFame" data-index="${i}" type="button">${t("share")}</button>
+    </div>`
+    )
+    .join("")}</div>`;
+}
+
 // The GOAT is the headline stat of the whole app — gets a hero card instead
 // of blending into another plain table row.
 function goatCard(goat) {
@@ -973,7 +1048,7 @@ function goatCard(goat) {
       (g, i) => `
     <tr class="card-trigger-row" data-card="goat" data-index="${i + 1}" data-owner-id="${escapeHtml(g.ownerId)}" title="${escapeHtml(t("shareGoatRanking", g.displayName))}" role="button" tabindex="0" aria-label="${escapeHtml(t("shareGoatRanking", g.displayName))}">
       <td>${i + 2}</td>
-      <td>${escapeHtml(g.displayName)}</td>
+      <td class="name-cell">${escapeHtml(g.displayName)}</td>
       <td>${g.championships > 0 ? "🏆".repeat(g.championships) : "—"}</td>
       <td>${g.wins}-${g.losses}${g.ties ? `-${g.ties}` : ""}</td>
       <td>${(g.winPct * 100).toFixed(1)}%</td>

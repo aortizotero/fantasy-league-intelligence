@@ -31,6 +31,8 @@
 }
 </script>
 
+<link rel="preload" href="fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/jetbrains-mono-latin-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
 <!-- Turnstile can't be self-hosted (it's a live bot-check against Cloudflare's
      edge) — the one deliberate exception to this project's no-runtime-CDN rule. -->
@@ -53,6 +55,25 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <!-- End Google Tag Manager -->
 </head>
 <body>
+<!--
+THESIS: every stat is a lit digit against its own dark ghosts — the site
+reads like a stadium scoreboard/instrument panel, refusing the generic
+white-card-soft-shadow dashboard default.
+OWN-WORLD: ink-blue-black ground (dark, primary) / bone-paper ground
+(light, secondary); one cathode-amber accent glows for "the real/yours"
+value, low-opacity ghosts for alternatives; JetBrains Mono for numerals/
+headings/labels, Inter for body prose. No card-box elevation — grouping
+via hairline top-rules and a faint mesh grille, not borders+shadow.
+STORY: a manager glances at a number (record, verdict, ranking) and sees
+it struck forward glowing against every unlit alternative.
+FIRST VIEWPORT: Week Recap as the marquee — the week's real score glows
+amber over the ghost of the rest of the week's matchups.
+FORM: Scoreboard/Marquee direction (challenger operate-b-struck-cathode-
+gauze), chosen over the assigned Box Score/Ledger direction; seed key d6fe5c6d.
+FINISH: unreviewed and undocumented is unfinished; this build ends with
+the finish review, the verdict, DESIGN.md, and every shipping raster
+carrying its provenance.
+-->
 <!-- Google Tag Manager (noscript) -->
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WGRJW88Z"
 height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
@@ -124,7 +145,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
     <div class="section-group-header" id="group-right-now" data-i18n="groupRightNow">🟢 Right Now</div>
 
-    <section id="week-recap-section" hidden>
+    <section id="week-recap-section" class="section-anchor" hidden>
       <h2 data-i18n="weekRecapTitle">📅 Week Recap</h2>
       <div id="week-recap"></div>
     </section>
@@ -190,7 +211,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div id="rivalry-cards"></div>
     </section>
 
-    <section id="narratives-section">
+    <section id="narratives-section" class="section-anchor">
       <h2 data-i18n="narrativesTitle">📖 The Stories of Your League</h2>
       <p class="hint" data-i18n="narrativesHint">What the numbers don't tell you at a glance.</p>
       <div id="narratives"></div>
@@ -204,6 +225,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <button type="button" id="coachmark-dismiss" data-i18n-aria-label="coachmarkDismiss" aria-label="Dismiss">✕</button>
       </div>
       <div id="goat"></div>
+    </section>
+
+    <section id="hall-of-fame-section" class="section-anchor" hidden>
+      <h2 data-i18n="hallOfFameTitle">🏛️ Hall of Fame</h2>
+      <p class="hint" data-i18n="hallOfFameHint">Four career questions, answered once each — not just who's best overall.</p>
+      <div id="hall-of-fame"></div>
     </section>
 
     <section>
