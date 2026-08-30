@@ -6,6 +6,8 @@ Herramienta de analítica de fantasy football que arranca como una integración 
 
 **[🔴 En vivo: storyofmyleague.com](https://www.storyofmyleague.com)** — standings, historial head-to-head, ranking GOAT, historias de jugadores/draft/trades, y stat cards compartibles. Código en [`v1/`](v1/).
 
+**[→ Roadmap de producto: fases de MVP viral, engagement, monetización y escala](ROADMAP.es.md)**
+
 ## El arco
 
 Cada versión agrega un tipo de integración genuinamente distinto, no solo más features sobre el mismo stack:

@@ -6,6 +6,8 @@ A fantasy football analytics tool that starts as a simple API integration and gr
 
 **[🔴 Live: storyofmyleague.com](https://www.storyofmyleague.com)** — standings, head-to-head history, GOAT rankings, player/draft/trade storylines, and shareable stat cards. Source in [`v1/`](v1/).
 
+**[→ Product roadmap: viral MVP, engagement, monetization, and scale phases](ROADMAP.md)**
+
 ## The arc
 
 Each version adds a genuinely different kind of integration, not just more features on the same stack:
