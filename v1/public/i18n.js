@@ -73,6 +73,16 @@ const STRINGS = {
     shareGoat: "Share the league GOAT",
     shareGoatRanking: (name) => `Share ${name}'s ranking`,
 
+    hallOfFameTitle: "🏛️ Hall of Fame",
+    hallOfFameHint: "Four career questions, answered once each — not just who's best overall.",
+    hofCategoryChampionships: "Most Championships",
+    hofCategoryCareerPoints: "Most Career Points",
+    hofCategoryWinPct: "Best All-Time Win%",
+    hofCategoryStreak: "Longest Win Streak",
+    hofTitleSingular: "title",
+    hofTitlesPlural: "titles",
+    hofGamesSuffix: "games",
+
     h2hTitle: "Head-to-Head",
     h2hHint: "Every grudge match on the books, across every season.",
     shareH2H: "Share this head-to-head",
@@ -314,6 +324,16 @@ const STRINGS = {
     tapRowHint: "📤 Toca una fila para generar su stat card",
     shareGoat: "Compartir el GOAT de la liga",
     shareGoatRanking: (name) => `Compartir el ranking de ${name}`,
+
+    hallOfFameTitle: "🏛️ Salón de la Fama",
+    hallOfFameHint: "Cuatro preguntas de carrera, cada una con su propia respuesta — no solo quién es el mejor en general.",
+    hofCategoryChampionships: "Más Campeonatos",
+    hofCategoryCareerPoints: "Más Puntos de Carrera",
+    hofCategoryWinPct: "Mejor Win% Histórico",
+    hofCategoryStreak: "Racha de Victorias Más Larga",
+    hofTitleSingular: "título",
+    hofTitlesPlural: "títulos",
+    hofGamesSuffix: "partidos",
 
     h2hTitle: "Head-to-Head",
     h2hHint: "Cada rivalidad registrada, de todas las temporadas.",

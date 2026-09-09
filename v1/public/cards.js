@@ -110,6 +110,10 @@ function buildCardHtml(ds) {
       const n = currentData.narratives[Number(ds.index)];
       return n ? narrativeCardHtml(n, leagueName) : null;
     }
+    case "hallOfFame": {
+      const e = currentData.hallOfFame[Number(ds.index)];
+      return e ? hallOfFameCardHtml(e, leagueName) : null;
+    }
     case "personal":
       // "Mi equipo" rivalry cards (Némesis/Víctima) — computed client-side
       // by myteam.js, so the data rides along on the trigger button itself
@@ -351,6 +355,43 @@ function tradeSuggestCardHtml(ds, leagueName) {
     <div class="ai-divider"></div>
     <div class="ai-text">${escapeHtml(ds.summary)}</div>`,
     isPropose ? "" : "ai-card--neutral"
+  );
+}
+
+// Four record-book categories, each with a differently-shaped stat line —
+// duplicated (not imported) from app.js's own formatting on purpose: this
+// file already keeps its own escapeHtml() rather than depend on load order
+// across the classic-script files (see the comment on that below), same
+// reasoning applies here.
+const HOF_CARD_LABEL_KEYS = {
+  championships: "hofCategoryChampionships",
+  careerPoints: "hofCategoryCareerPoints",
+  winPct: "hofCategoryWinPct",
+  streak: "hofCategoryStreak",
+};
+
+function hallOfFameStatLineForCard(e) {
+  switch (e.category) {
+    case "championships":
+      return `${e.championships} ${e.championships === 1 ? t("hofTitleSingular") : t("hofTitlesPlural")}`;
+    case "careerPoints":
+      return `${e.pointsFor.toFixed(1)} ${t("cardPoints")} · ${e.seasons} ${t("colSeasons").toLowerCase()}`;
+    case "winPct":
+      return `${(e.winPct * 100).toFixed(1)}% (${e.wins}-${e.losses}${e.ties ? `-${e.ties}` : ""})`;
+    case "streak":
+      return `${e.streak} ${t("hofGamesSuffix")} · ${e.season}`;
+    default:
+      return "";
+  }
+}
+
+// Reuses the plain narrative card shell wholesale — a Hall of Fame tile is
+// icon/title/headline/detail, same as any other narrative, just sourced
+// from currentData.hallOfFame instead of currentData.narratives.
+function hallOfFameCardHtml(e, leagueName) {
+  return narrativeCardHtml(
+    { icon: e.icon, title: t(HOF_CARD_LABEL_KEYS[e.category]), headline: e.displayName, detail: hallOfFameStatLineForCard(e) },
+    leagueName
   );
 }
 

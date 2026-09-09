@@ -7,6 +7,7 @@ import {
   getHistoricalStandings,
   computeH2H,
   computeGOAT,
+  computeHallOfFame,
   computeNarratives,
   getPlayersMap,
   getChampionsBySeasonIndex,
@@ -107,6 +108,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       rosterValue,
       positionPointsReport,
       rosterPlayerPool,
+      hallOfFame,
     ] = await Promise.all([
       computeRosterDepth(league, playersMap),
       computeDraftPickCapital(league),
@@ -120,6 +122,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       computeRosterValue(league, playersMap),
       computePositionPointsReport(league, playersMap),
       computeRosterPlayerPool(league, playersMap),
+      computeHallOfFame(chain, goat),
     ]);
 
     res.json({
@@ -142,6 +145,7 @@ app.get("/api/league/:leagueId", async (req, res) => {
       rosterValue,
       positionPointsReport,
       rosterPlayerPool,
+      hallOfFame,
     });
   } catch (err) {
     console.error(err);

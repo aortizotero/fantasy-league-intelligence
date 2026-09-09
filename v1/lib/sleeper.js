@@ -382,6 +382,99 @@ export async function computeGOAT(chain, seasonStandings) {
   return career;
 }
 
+// Longest consecutive-win streak per manager, across the whole chain in
+// chronological order (oldest season to newest). Walks the exact same
+// per-week matchup shape as computeH2H (weeks 1..playoffs-start-1, paired by
+// matchup_id, same ghost-week guard) but tracks one running streak per
+// ownerId instead of pairwise records — getMatchupsCached means this is
+// cache hits, not new API calls, since computeH2H already primed it.
+async function computeLongestWinStreaks(chain) {
+  const names = new Map();
+  const streaks = new Map(); // ownerId -> { current, best, bestSeason }
+
+  for (const league of chain) {
+    const rosterMap = await buildRosterMap(league);
+    for (const { ownerId, displayName } of rosterMap.values()) {
+      names.set(ownerId, displayName);
+    }
+
+    const lastWeek = (league.settings?.playoff_week_start || 15) - 1;
+    const weeks = Array.from({ length: Math.max(lastWeek, 0) }, (_, i) => i + 1);
+
+    for (const week of weeks) {
+      const matchups = await getMatchupsCached(league.league_id, week);
+      if (!matchups || matchups.length === 0) continue;
+      if (!matchups.some((m) => (m.points || 0) > 0)) continue;
+
+      const byMatchupId = new Map();
+      for (const m of matchups) {
+        if (m.matchup_id == null) continue;
+        if (!byMatchupId.has(m.matchup_id)) byMatchupId.set(m.matchup_id, []);
+        byMatchupId.get(m.matchup_id).push(m);
+      }
+
+      for (const pair of byMatchupId.values()) {
+        if (pair.length !== 2) continue;
+        const [m1, m2] = pair;
+        const r1 = rosterMap.get(m1.roster_id);
+        const r2 = rosterMap.get(m2.roster_id);
+        if (!r1 || !r2) continue;
+        const pts1 = m1.points || 0;
+        const pts2 = m2.points || 0;
+        const tied = pts1 === pts2;
+
+        for (const [ownerId, won] of [
+          [r1.ownerId, pts1 > pts2],
+          [r2.ownerId, pts2 > pts1],
+        ]) {
+          if (!streaks.has(ownerId)) streaks.set(ownerId, { current: 0, best: 0, bestSeason: null });
+          const s = streaks.get(ownerId);
+          if (tied || !won) {
+            s.current = 0;
+          } else {
+            s.current += 1;
+            if (s.current > s.best) {
+              s.best = s.current;
+              s.bestSeason = league.season;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return [...streaks.entries()]
+    .map(([ownerId, s]) => ({ ownerId, displayName: names.get(ownerId) || ownerId, streak: s.best, season: s.bestSeason }))
+    .sort((a, b) => b.streak - a.streak);
+}
+
+// All-time career leaderboards — narrower than GOAT ("who's best overall")
+// on purpose: each entry answers one specific record-book question, so a
+// league can argue about four different things instead of just the one
+// ranking. Reuses the GOAT career totals wholesale for 3 of 4 categories
+// (zero extra computation); only the win-streak category needs its own
+// pass, and even that costs no new API calls (see computeLongestWinStreaks).
+export async function computeHallOfFame(chain, goat) {
+  const MIN_CAREER_GAMES = 15; // same bar as the Curse narrative — enough games for win% to mean something
+  const entries = [];
+
+  const byChampionships = [...goat].filter((g) => g.championships > 0).sort((a, b) => b.championships - a.championships)[0];
+  if (byChampionships) entries.push({ category: "championships", icon: "🏆", ...byChampionships });
+
+  const byCareerPoints = [...goat].sort((a, b) => b.pointsFor - a.pointsFor)[0];
+  if (byCareerPoints) entries.push({ category: "careerPoints", icon: "📈", ...byCareerPoints });
+
+  const eligible = goat.filter((g) => g.wins + g.losses + g.ties >= MIN_CAREER_GAMES);
+  const byWinPct = [...eligible].sort((a, b) => b.winPct - a.winPct)[0];
+  if (byWinPct) entries.push({ category: "winPct", icon: "📊", ...byWinPct });
+
+  const streaks = await computeLongestWinStreaks(chain);
+  const byStreak = streaks.find((s) => s.streak > 0);
+  if (byStreak) entries.push({ category: "streak", icon: "🔥", ...byStreak });
+
+  return entries;
+}
+
 const POSITION_COLUMNS = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
 // Current roster composition per manager — who's stacked at a position (a
