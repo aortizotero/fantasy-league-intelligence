@@ -23,6 +23,7 @@ import {
   computeRosterValue,
   computePositionPointsReport,
   computeRosterPlayerPool,
+  getUserLeagues,
 } from "./lib/sleeper.js";
 import { analyzeTrade, simulateTradeAnalysis, roastTeam, suggestTrade } from "./lib/claude.js";
 import { checkTurnstile } from "./lib/turnstile.js";
@@ -150,6 +151,53 @@ app.get("/api/league/:leagueId", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: errors.loadFailed + err.message });
+  }
+});
+
+// Alternate entry point to the league lookup above — finds a manager's
+// leagues by Sleeper username instead of requiring their League ID. Scoped
+// to the current calendar year's NFL season only (the League ID field above
+// always wants the *current* season's league anyway; computeH2H/computeGOAT
+// walk backward through previous_league_id to build the rest of the
+// history). Gated by the same Turnstile check as /api/league/:leagueId —
+// it's the same "front door" trust boundary, and the cookie set by an
+// earlier call already covers this one for free.
+app.get("/api/user-leagues/:username", async (req, res) => {
+  const lang = req.query.lang === "es" ? "es" : "en";
+  const errors = {
+    en: {
+      notFound: "Sleeper username not found.",
+      noLeagues: "No NFL leagues found for this season under that username.",
+      failed: "Couldn't look up leagues. ",
+      turnstileFailed: "Security check failed. Please try again.",
+    },
+    es: {
+      notFound: "Usuario de Sleeper no encontrado.",
+      noLeagues: "No se encontraron ligas de NFL de esta temporada con ese usuario.",
+      failed: "No se pudieron buscar las ligas. ",
+      turnstileFailed: "Falló la verificación de seguridad. Intenta de nuevo.",
+    },
+  }[lang];
+
+  const passedTurnstile = await checkTurnstile(req, res);
+  if (!passedTurnstile) {
+    return res.status(403).json({ error: errors.turnstileFailed });
+  }
+
+  const username = (req.params.username || "").trim();
+  if (!username || username.length > 50) {
+    return res.status(404).json({ error: errors.notFound });
+  }
+
+  try {
+    const season = String(new Date().getFullYear());
+    const leagues = await getUserLeagues(username, season);
+    if (!leagues) return res.status(404).json({ error: errors.notFound });
+    if (!leagues.length) return res.status(404).json({ error: errors.noLeagues });
+    res.json({ leagues });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: errors.failed + err.message });
   }
 });
 

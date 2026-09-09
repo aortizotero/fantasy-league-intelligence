@@ -109,7 +109,19 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
          data-error-callback="onTurnstileError"></div>
   </div>
   <p id="league-id-error" class="field-error"></p>
-  <p class="hint form-help"><a href="https://support.sleeper.com/en/articles/4121798-how-do-i-find-my-league-id" target="_blank" rel="noopener noreferrer" data-i18n="findLeagueId">Where do I find my League ID?</a></p>
+  <p class="hint form-help">
+    <a href="https://support.sleeper.com/en/articles/4121798-how-do-i-find-my-league-id" target="_blank" rel="noopener noreferrer" data-i18n="findLeagueId">Where do I find my League ID?</a>
+    <span aria-hidden="true"> · </span>
+    <button type="button" id="username-lookup-toggle" class="link-btn" data-i18n="usernameLookupToggle">Or find your leagues by Sleeper username</button>
+  </p>
+
+  <form id="username-lookup-form" hidden>
+    <label for="sleeper-username" class="sr-only" data-i18n="usernameLabel">Sleeper username</label>
+    <input type="text" id="sleeper-username" data-i18n-placeholder="usernamePlaceholder" placeholder="Sleeper username">
+    <button type="submit" id="username-lookup-submit" disabled data-i18n="findLeaguesBtn">Find My Leagues</button>
+  </form>
+  <p id="username-lookup-error" class="field-error"></p>
+  <div id="username-lookup-result"></div>
 
   <p id="status" role="status"></p>
 

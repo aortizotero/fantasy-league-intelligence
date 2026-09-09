@@ -1,9 +1,16 @@
 const form = document.getElementById("league-form");
 const statusEl = document.getElementById("status");
 const results = document.getElementById("results");
+const aboutSection = document.getElementById("about-section");
 const leagueIdInput = document.getElementById("league-id");
 const leagueIdError = document.getElementById("league-id-error");
 const leagueSubmit = document.getElementById("league-submit");
+const usernameLookupToggle = document.getElementById("username-lookup-toggle");
+const usernameLookupForm = document.getElementById("username-lookup-form");
+const usernameInput = document.getElementById("sleeper-username");
+const usernameLookupError = document.getElementById("username-lookup-error");
+const usernameLookupSubmit = document.getElementById("username-lookup-submit");
+const usernameLookupResult = document.getElementById("username-lookup-result");
 
 let activeLeagueId = null;
 let turnstileToken = null; // set by onTurnstileSuccess (Cloudflare Turnstile, index.html) — sent as X-Turnstile-Token on the first request; the server's response cookie covers every later one in the session
@@ -65,21 +72,83 @@ leagueIdInput.addEventListener("input", () => {
   leagueIdError.textContent = "";
 });
 
+// Alternate entry point — the League ID field above stays the primary path
+// (whoever already has their League ID shouldn't need an extra click), this
+// toggle just reveals a second, equally simple form beside it.
+usernameLookupToggle.addEventListener("click", () => {
+  usernameLookupForm.hidden = !usernameLookupForm.hidden;
+  if (!usernameLookupForm.hidden) usernameInput.focus();
+});
+
+usernameLookupForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = usernameInput.value.trim();
+  if (!username) return;
+
+  usernameLookupError.textContent = "";
+  usernameLookupResult.innerHTML = "";
+  usernameLookupSubmit.disabled = true;
+  usernameLookupSubmit.textContent = t("findingLeagues");
+
+  try {
+    const res = await fetch(`/api/user-leagues/${encodeURIComponent(username)}?lang=${getLang()}`, {
+      headers: { "X-Turnstile-Token": turnstileToken || "" },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || t("unknownError"));
+    usernameLookupResult.innerHTML = usernameLeaguesHtml(data.leagues);
+  } catch (err) {
+    usernameLookupError.textContent = "⚠️ " + err.message;
+  } finally {
+    usernameLookupSubmit.disabled = false;
+    usernameLookupSubmit.textContent = t("findLeaguesBtn");
+  }
+});
+
+function usernameLeaguesHtml(leagues) {
+  const rows = leagues
+    .map(
+      (l) => `
+    <button type="button" class="league-result-btn" data-league-id="${escapeHtml(l.leagueId)}">
+      <span>${escapeHtml(l.name)}</span>
+      <span class="league-result-season">${escapeHtml(l.season)}</span>
+    </button>`
+    )
+    .join("");
+  return `<p class="hint">${t("usernameLookupPickHint")}</p>${rows}`;
+}
+
+usernameLookupResult.addEventListener("click", (e) => {
+  const btn = e.target.closest(".league-result-btn");
+  if (!btn) return;
+  const leagueId = btn.dataset.leagueId;
+  leagueIdInput.value = leagueId;
+  usernameLookupForm.hidden = true;
+  usernameLookupResult.innerHTML = "";
+  activeLeagueId = leagueId;
+  loadLeague(leagueId);
+});
+
 // Cloudflare Turnstile callbacks — referenced by name from the
 // data-callback/data-expired-callback/data-error-callback attributes on the
-// .cf-turnstile div in index.html (implicit rendering). The submit button
-// starts disabled in the markup; it only becomes usable once a token exists.
+// .cf-turnstile div in index.html (implicit rendering). Both submit buttons
+// start disabled in the markup; they only become usable once a token
+// exists — one widget covers both forms, since they're the same trust
+// boundary (see checkTurnstile in lib/turnstile.js).
 window.onTurnstileSuccess = function onTurnstileSuccess(token) {
   turnstileToken = token;
   leagueSubmit.disabled = false;
+  usernameLookupSubmit.disabled = false;
 };
 window.onTurnstileExpired = function onTurnstileExpired() {
   turnstileToken = null;
   leagueSubmit.disabled = true;
+  usernameLookupSubmit.disabled = true;
 };
 window.onTurnstileError = function onTurnstileError() {
   turnstileToken = null;
   leagueSubmit.disabled = true;
+  usernameLookupSubmit.disabled = true;
 };
 
 // Re-invoked by i18n.js after a language switch, if a league is already
@@ -108,6 +177,7 @@ async function loadLeague(leagueId) {
     if (window.initTradeSuggest) window.initTradeSuggest(data);
     statusEl.textContent = "";
     results.hidden = false;
+    aboutSection.hidden = true;
     setupScrollReveal();
     maybeShowCoachmark();
     maybeShowScrollHint();

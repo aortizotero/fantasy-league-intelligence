@@ -54,6 +54,16 @@ export function getTradedPicks(leagueId) {
   return fetchJSON(`${BASE}/league/${leagueId}/traded_picks`);
 }
 
+// Alternate entry point to the League ID field — a manager who doesn't have
+// their League ID handy can look it up by Sleeper username instead. Sleeper
+// returns `null` (200 OK, not a 404) for a username that doesn't exist.
+export async function getUserLeagues(username, season) {
+  const user = await fetchJSON(`${BASE}/user/${encodeURIComponent(username.trim())}`);
+  if (!user) return null;
+  const leagues = await fetchJSON(`${BASE}/user/${user.user_id}/leagues/nfl/${season}`);
+  return leagues.map((l) => ({ leagueId: l.league_id, name: l.name, season: l.season, totalRosters: l.total_rosters }));
+}
+
 const bracketCache = new Map(); // league_id -> Promise<bracket|null>
 
 // The bracket is small and reused by several features (champion, runner-up,
