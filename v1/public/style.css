@@ -948,6 +948,7 @@ th.is-me { color: var(--accent-text); }
 .trend-name { font-family: var(--font-body); font-size: 13px; flex-shrink: 0; }
 .sparkline { width: 160px; height: 32px; flex-shrink: 0; }
 .sparkline polyline { fill: none; stroke: var(--accent); stroke-width: 2; }
+.sparkline circle { fill: var(--accent); }
 
 /* ---- Transaction History ------------------------------------------------ */
 .transaction-row { padding: 12px 0; border-bottom: 1px solid var(--border); }

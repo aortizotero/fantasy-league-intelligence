@@ -839,9 +839,12 @@ function seasonTrendHtml(seasonTrend) {
 }
 
 function sparklineSvg(values) {
-  if (values.length < 2) return "";
   const w = 160;
   const h = 32;
+  if (!values.length) return "";
+  if (values.length === 1) {
+    return `<svg class="sparkline" viewBox="0 0 ${w} ${h}"><circle cx="${w / 2}" cy="${h / 2}" r="3" /></svg>`;
+  }
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
