@@ -286,3 +286,25 @@ _Este archivo se debe actualizar a mano con decisiones y contexto duradero del p
 ## Memoria persistente (Tier 2)
 
 Este proyecto usa `MEMORY.md` + `memory/` para memoria persistente entre sesiones (formato del skill architect-audit-migration). Revisar `MEMORY.md` al iniciar sesion; agregar entradas conforme surjan hechos, decisiones o feedback que valga la pena recordar.
+
+## Capas de arquitectura
+
+Revisión 2026-10-10 contra el checklist de 13 capas de `~/CLAUDE.md`. ✅ cubierta · ⚠️ parcial · ❌ falta · N/A no aplica. Actualizar al cerrar cada cambio de arquitectura.
+
+| Capa | Estado | Nota |
+|---|---|---|
+| 1 Front end | ✅ | JS clásico sin build, EN/ES, design system en `DESIGN.md` |
+| 2 APIs/backend | ✅ | 6 endpoints en `server.js` con validación de forma/longitud |
+| 3 DB/storage | N/A | sin DB; caches `Map` en memoria |
+| 4 Auth/permisos | N/A | sin cuentas por diseño; cookie HMAC de Turnstile |
+| 5 Hosting/deploy | ✅ | Vercel con auto-deploy desde GitHub |
+| 6 Cloud/compute | ⚠️ | serverless: caches en memoria se pierden en cold start (dump de Sleeper ~5MB) |
+| 7 CI/CD + git | ⚠️ | git con remoto, sin tests ni CI |
+| 8 Seguridad/RLS | ⚠️ | 2026-10-10: headers HSTS/XFO/nosniff/Referrer/Permissions + perfil `/api` en `server.js`; falta CSP de página (GTM la complica) |
+| 9 Rate limiting | ✅ | 2026-10-10: `aiGate` en los 4 endpoints de IA (cookie Turnstile + 20/h por IP, en memoria por instancia). Reemplaza la decisión anterior de no gatearlos: antes cualquiera podía gastar Anthropic con un script |
+| 10 Caching/CDN | ⚠️ | CDN de Vercel para estáticos; sin `Cache-Control` explícito |
+| 11 Load balancing/scaling | ✅ | serverless autoescala |
+| 12 Errores/logs | ⚠️ | solo consola/logs de Vercel |
+| 13 Availability/recovery | ⚠️ | degrada sin ESPN/Anthropic; depende de APIs de terceros sin SLA |
+
+**Siguiente: CSP de página compatible con GTM; tope de gasto en la consola de Anthropic.**

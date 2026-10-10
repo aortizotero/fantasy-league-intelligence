@@ -32,8 +32,60 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 
 const app = express();
+// Behind Vercel's / Coolify's proxy — without this every visitor shares the
+// proxy's IP and the per-IP AI limit below would be one global bucket.
+app.set("trust proxy", 1);
+
+// Security headers (~/CLAUDE.md convention). No page CSP yet: GTM injects
+// arbitrary tags, so a tight one would silently break analytics.
+app.use((req, res, next) => {
+  res.set({
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+  });
+  if (req.path.startsWith("/api/")) {
+    res.set({
+      "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+      "Cache-Control": "no-store",
+      "Cross-Origin-Resource-Policy": "same-origin",
+    });
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
+
+// Gate for the four routes that call Claude: the Turnstile cookie (already
+// set when the league loaded, see lib/turnstile.js) plus a per-IP cap. The
+// cap is in-memory, so per serverless instance — not exact, but enough to
+// stop a script looping on the endpoint and burning Anthropic credits.
+const AI_LIMIT = 20;
+const AI_WINDOW_MS = 60 * 60 * 1000;
+const aiHits = new Map();
+
+async function aiGate(req, res, next) {
+  const es = req.body?.lang === "es";
+  if (!(await checkTurnstile(req, res))) {
+    return res.status(403).json({
+      error: es ? "Tu sesión expiró. Recarga la liga e intenta de nuevo." : "Your session expired. Reload the league and try again.",
+    });
+  }
+  const now = Date.now();
+  const hits = (aiHits.get(req.ip) || []).filter((t) => now - t < AI_WINDOW_MS);
+  if (hits.length >= AI_LIMIT) {
+    return res.status(429).json({
+      error: es ? "Llegaste al límite de análisis con IA por ahora. Intenta en un rato." : "You've hit the AI analysis limit for now. Try again later.",
+    });
+  }
+  hits.push(now);
+  if (aiHits.size > 10000) aiHits.clear();
+  aiHits.set(req.ip, hits);
+  next();
+}
 
 // Everything a league needs in one call: current standings, full season
 // history, head-to-head records, and career (GOAT) rankings.
@@ -218,7 +270,7 @@ function isValidTradeSide(side) {
   );
 }
 
-app.post("/api/trade-analysis", async (req, res) => {
+app.post("/api/trade-analysis", aiGate, async (req, res) => {
   const lang = req.body?.lang === "es" ? "es" : "en";
   const errors = {
     en: { badRequest: "Invalid trade data.", notConfigured: "AI analysis isn't configured for this deployment.", failed: "Couldn't generate the analysis. " },
@@ -284,7 +336,7 @@ function isValidSimulatedTeam(team) {
   );
 }
 
-app.post("/api/trade-simulate", async (req, res) => {
+app.post("/api/trade-simulate", aiGate, async (req, res) => {
   const lang = req.body?.lang === "es" ? "es" : "en";
   const errors = {
     en: { badRequest: "Invalid trade data.", notConfigured: "AI analysis isn't configured for this deployment.", failed: "Couldn't generate the analysis. " },
@@ -360,7 +412,7 @@ function isValidLeagueTeam(t) {
   );
 }
 
-app.post("/api/roast-team", async (req, res) => {
+app.post("/api/roast-team", aiGate, async (req, res) => {
   const lang = req.body?.lang === "es" ? "es" : "en";
   const errors = {
     en: { badRequest: "Invalid team data.", notConfigured: "AI analysis isn't configured for this deployment.", failed: "Couldn't generate the roast. " },
@@ -425,7 +477,7 @@ function isValidTeamRecord(record) {
   );
 }
 
-app.post("/api/trade-suggest", async (req, res) => {
+app.post("/api/trade-suggest", aiGate, async (req, res) => {
   const lang = req.body?.lang === "es" ? "es" : "en";
   const errors = {
     en: { badRequest: "Invalid team data.", notConfigured: "AI analysis isn't configured for this deployment.", failed: "Couldn't generate the suggestion. " },
