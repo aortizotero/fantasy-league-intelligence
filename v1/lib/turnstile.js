@@ -11,7 +11,7 @@
 //
 // No new npm dependency: res.cookie() is built into Express, and this only
 // ever needs to read one fixed-name cookie, so a two-line manual parse
-// stands in for cookie-parser. Signing reuses TURNSTILE_SECRET_KEY itself
+// stands in for cookie-parser. Signing reuses TURNSTILE_SECRET itself
 // as the HMAC key rather than introducing a second secret.
 
 import crypto from "node:crypto";
@@ -21,7 +21,7 @@ const COOKIE_NAME = "fli_turnstile";
 const COOKIE_TTL_MS = 60 * 60 * 1000; // 1h — long enough a normal browsing session never re-prompts, short enough a stale pass doesn't linger for days
 
 function sign(value) {
-  return crypto.createHmac("sha256", process.env.TURNSTILE_SECRET_KEY).update(value).digest("hex");
+  return crypto.createHmac("sha256", process.env.TURNSTILE_SECRET).update(value).digest("hex");
 }
 
 function makeCookieValue() {
@@ -50,14 +50,14 @@ function readCookie(req) {
 // Cloudflare setup) degrades to a no-op, same convention as lib/claude.js
 // when ANTHROPIC_API_KEY is missing.
 export async function checkTurnstile(req, res) {
-  if (!process.env.TURNSTILE_SECRET_KEY) return true;
+  if (!process.env.TURNSTILE_SECRET) return true;
 
   if (isCookieValid(readCookie(req))) return true;
 
   const token = req.get("X-Turnstile-Token");
   if (!token) return false;
 
-  const body = new URLSearchParams({ secret: process.env.TURNSTILE_SECRET_KEY, response: token });
+  const body = new URLSearchParams({ secret: process.env.TURNSTILE_SECRET, response: token });
   if (req.ip) body.set("remoteip", req.ip);
 
   let verified = false;
